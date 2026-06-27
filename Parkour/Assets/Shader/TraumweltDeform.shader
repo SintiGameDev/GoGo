@@ -45,8 +45,6 @@ Shader "Traumwelt/VertexNoiseDeform"
         [Toggle]_RecalcNormals("Normals per Differenzen neu berechnen", Float) = 1
         _NormalRecalcOffset("Normal Recalc Sample Offset", Float) = 0.01
 
-        // URP Lit-kompatible Hidden Properties (fuer SRP Batcher / Inspector-Konsistenz)
-        [HideInInspector]_Surface("__surface", Float) = 0.0
         [HideInInspector]_Cull("__cull", Float) = 2.0
     }
 
@@ -483,6 +481,8 @@ Shader "Traumwelt/VertexNoiseDeform"
                 return (maxAmp > 0.0) ? (total / maxAmp) : 0.0;
             }
 
+            float3 _LightDirection;
+
             float4 GetShadowPositionHClip(float3 positionOS, float3 normalOS)
             {
                 float3 worldPosUndisplaced = TransformObjectToWorld(positionOS);
@@ -495,9 +495,16 @@ Shader "Traumwelt/VertexNoiseDeform"
                 float3 displacedOS = positionOS + normalize(normalOS) * n;
 
                 float3 positionWS = TransformObjectToWorld(displacedOS);
-                float3 normalWS = TransformObjectToWorldNormal(normalOS);
+                float3 normalWS = normalize(TransformObjectToWorldNormal(normalOS));
 
-                float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, _LightDirection));
+                // Manuelle, versionsunabhaengige Shadow-Bias-Berechnung
+                // (ersetzt ApplyShadowBias, da Signatur je nach URP-Version variiert)
+                float invNdotL = 1.0 - saturate(dot(_LightDirection, normalWS));
+                float scale = invNdotL * _ShadowBias.y;
+                positionWS = _LightDirection * _ShadowBias.xxx + positionWS;
+                positionWS = normalWS * scale.xxx + positionWS;
+
+                float4 positionCS = TransformWorldToHClip(positionWS);
 
                 #if UNITY_REVERSED_Z
                     positionCS.z = min(positionCS.z, UNITY_NEAR_CLIP_VALUE);
@@ -518,8 +525,6 @@ Shader "Traumwelt/VertexNoiseDeform"
             {
                 float4 positionCS : SV_POSITION;
             };
-
-            float3 _LightDirection;
 
             VaryingsShadow vertShadow(AttributesShadow IN)
             {
