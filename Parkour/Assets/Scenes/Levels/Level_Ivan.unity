@@ -4429,6 +4429,63 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2135417638}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1001 &1164730935131276362
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 4773672338238295216, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_Name
+      value: PlayerVan
+      objectReference: {fileID: 0}
+    - target: {fileID: 5016973051642665029, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -38.93451
+      objectReference: {fileID: 0}
+    - target: {fileID: 5016973051642665029, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5016973051642665029, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -2.2592392
+      objectReference: {fileID: 0}
+    - target: {fileID: 5016973051642665029, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.72729963
+      objectReference: {fileID: 0}
+    - target: {fileID: 5016973051642665029, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5016973051642665029, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.6863202
+      objectReference: {fileID: 0}
+    - target: {fileID: 5016973051642665029, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5016973051642665029, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5016973051642665029, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 86.679
+      objectReference: {fileID: 0}
+    - target: {fileID: 5016973051642665029, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 3aa62417edf29d9479988a690661cd15, type: 3}
 --- !u!1001 &4524604118180447146
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4541,6 +4598,34 @@ PrefabInstance:
     - target: {fileID: 1036552637450684959, guid: a0e3927377aa67340993914a39ff6d76, type: 3}
       propertyPath: m_Name
       value: FPSPlayer
+      objectReference: {fileID: 0}
+    - target: {fileID: 1036552637450684959, guid: a0e3927377aa67340993914a39ff6d76, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4893620623425000444, guid: a0e3927377aa67340993914a39ff6d76, type: 3}
+      propertyPath: autoJumpForce
+      value: 77
+      objectReference: {fileID: 0}
+    - target: {fileID: 6125933404379417880, guid: a0e3927377aa67340993914a39ff6d76, type: 3}
+      propertyPath: gravity
+      value: 42
+      objectReference: {fileID: 0}
+    - target: {fileID: 6125933404379417880, guid: a0e3927377aa67340993914a39ff6d76, type: 3}
+      propertyPath: runningSpeed
+      value: 50
+      objectReference: {fileID: 0}
+    - target: {fileID: 6125933404379417880, guid: a0e3927377aa67340993914a39ff6d76, type: 3}
+      propertyPath: walkingSpeed
+      value: 40
+      objectReference: {fileID: 0}
+    - target: {fileID: 6125933404379417880, guid: a0e3927377aa67340993914a39ff6d76, type: 3}
+      propertyPath: minLaunchAngle
+      value: 11.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6125933404379417880, guid: a0e3927377aa67340993914a39ff6d76, type: 3}
+      propertyPath: wallJumpHeightBoost
+      value: 50
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 3999707696816788914, guid: a0e3927377aa67340993914a39ff6d76, type: 3}
@@ -4674,6 +4759,7 @@ SceneRoots:
   - {fileID: 410087041}
   - {fileID: 832575519}
   - {fileID: 6458825782382696399}
+  - {fileID: 1164730935131276362}
   - {fileID: 900706991}
   - {fileID: 1582320076}
   - {fileID: 1458689071}

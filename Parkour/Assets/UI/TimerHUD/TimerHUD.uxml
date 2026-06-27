@@ -57,7 +57,7 @@
                         <ui:Label text="Neustart" class="result-hint-text" />
                     </ui:VisualElement>
                     <ui:VisualElement name="result-hint-next" class="result-hint">
-                        <ui:Label name="result-hint-next-key" text="ENTER" class="result-hint-key" />
+                        <ui:Label name="result-hint-next-key" text="LEERTASTE" class="result-hint-key" />
                         <ui:Label text="Nächstes Level" class="result-hint-text" />
                     </ui:VisualElement>
                 </ui:VisualElement>
