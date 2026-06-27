@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 4074600836896033996}
   - component: {fileID: 5865919666261550879}
   - component: {fileID: 7137635125959970069}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Enemy
   m_TagString: Grabbable
   m_Icon: {fileID: 0}
@@ -107,7 +107,7 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 1
+  m_Radius: 7
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!135 &7137635125959970069
 SphereCollider:

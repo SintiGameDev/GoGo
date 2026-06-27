@@ -130,6 +130,14 @@ MonoBehaviour:
   autoDetectAnimationDuration: 1
   collectEffect: {fileID: 0}
   collectSound: {fileID: 8300000, guid: f66214b20e1526d488f71558b1e625b9, type: 3}
+  playerAudioSource: {fileID: 0}
+  useFallbackAudio: 1
+  useShepardTone: 1
+  startPitch: 0.8
+  pitchIncrement: 0.1
+  maxPitch: 2
+  minPitch: 0.8
+  shepardOctaves: 3
   destroyChildren: 1
   disableColliderImmediately: 1
   showDebugInfo: 0

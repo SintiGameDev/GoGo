@@ -16,9 +16,9 @@ GameObject:
   - component: {fileID: 6125933404379417880}
   - component: {fileID: 3999707696816788914}
   - component: {fileID: 6049805492977812032}
-  - component: {fileID: 2419071791527057693}
   - component: {fileID: 375951632665203206}
   - component: {fileID: 2584267313266014871}
+  - component: {fileID: 8216699775367567169}
   m_Layer: 0
   m_Name: FPSPlayer
   m_TagString: Player
@@ -227,10 +227,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   walkingSpeed: 20
-  runningSpeed: 25
-  jumpSpeed: 40
-  wallJumpSpeed: 30
-  gravity: 70
+  runningSpeed: 30
+  jumpSpeed: 30
+  wallJumpSpeed: 20
+  gravity: 50
   playerCamera: {fileID: 2304776757904105273}
   lookSpeed: 3
   lookXLimit: 90
@@ -242,20 +242,12 @@ MonoBehaviour:
     m_Bits: 4294967295
   colliderObject: {fileID: 4538536580974083876}
   baseFOV: 80
-  maxFOV: 105
+  maxFOV: 90
   fovChangeDuration: 0.2
   fovSpeedThreshold: 15
-  maxVerticalBoostVelocity: 40
-  verticalBoostDecayRate: 5
-  allowVerticalBoostInAir: 1
   preserveHorizontalMomentumOnLanding: 1
   landingMomentumRetention: 0.85
-  maxSafeGroundImpactSpeed: 25
-  smoothSpeedTransitions: 1
   speedTransitionRate: 30
-  minVelocityThreshold: 9
-  velocityResetDelay: 0
-  autoResetBoostsOnLowVelocity: 1
   canMove: 1
 --- !u!114 &3999707696816788914
 MonoBehaviour:
@@ -294,82 +286,6 @@ MonoBehaviour:
   pitchRange: {x: 0.9, y: 1.1}
   timeBetweenWalkSteps: 0.5
   timeBetweenRunSteps: 0.3
---- !u!114 &2419071791527057693
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1036552637450684959}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 23098a9999ddab2428788174c1dc45d3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxSpeedBoost: 1.5
-  minSpeedBoost: 1.1
-  boostDuration: 0.5
-  optimalReactionTime: 0.1
-  boostCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  bunnyHopWindow: 1
-  bunnyHopMaxBoost: 1.25
-  bunnyHopMinBoost: 1.05
-  bunnyHopOptimalTime: 0.05
-  bunnyHopStacksWithWallJump: 1
-  preserveCurrentSpeed: 1
-  speedPreservationBonus: 1.001
-  minSpeedForPreservation: 48
-  alwaysUseHigherSpeed: 1
-  useSmoothTransitions: 1
-  boostFadeOutDuration: 0.5
-  fadeOutCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  preventBoostEndInAir: 1
 --- !u!114 &375951632665203206
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -442,6 +358,23 @@ MonoBehaviour:
   surfFOVBonus: 20
   fovTransitionSpeed: 0.2
   showDebugInfo: 1
+--- !u!114 &8216699775367567169
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1036552637450684959}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19303dbd9ede37b4c88873724de8d7b3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  comboBoostPerJump: 0.25
+  maxComboMultiplier: 3
+  comboWindow: 1
+  boostHoldDuration: 1
+  decayRate: 2
 --- !u!1 &2876241451336742777
 GameObject:
   m_ObjectHideFlags: 0
