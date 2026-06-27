@@ -37,12 +37,12 @@ public class FootstepController : MonoBehaviour
         characterController = GetComponent<CharacterController>();
 
         // Sicherstellen, dass die Audio-Clips zugewiesen sind
-        //if (footstepSounds == null || footstepSounds.Count == 0)
-        //{
+        if (footstepSounds == null || footstepSounds.Count == 0)
+        {
             //Debug.LogError("Keine Schrittgeräusche zugewiesen! Bitte fügen Sie AudioClips im Inspector hinzu.");
-            //enabled = false;
-            //return;
-        //}
+            enabled = false;
+            return;
+        }
 
         // Initialen Schrittintervall setzen und Timer vorbereiten
         currentStepInterval = timeBetweenWalkSteps;

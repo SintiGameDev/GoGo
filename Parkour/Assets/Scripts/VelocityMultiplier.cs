@@ -4,24 +4,30 @@ using UnityEngine;
 
 public class VelocityMultiplier : MonoBehaviour
 {
-    [Header("Wall Jump Combo Settings")]
-    [Tooltip("Wie viel Speed-Multiplier pro Walljump in der Combo addiert wird")]
-    public float comboBoostPerJump = 0.25f;
-    [Tooltip("Maximaler Speed-Multiplier durch Combo")]
+    [Header("Jump Tempo Settings")]
+    [Tooltip("Airtime (Zeit zwischen Absprung und naechstem Jump) unter diesem Wert gibt den maximalen Boost-Zuwachs")]
+    public float fastestJumpInterval = 0.15f;
+    [Tooltip("Airtime ueber diesem Wert zaehlt nicht mehr als 'schnelle Folge' -> Reset")]
+    public float slowestJumpInterval = 1.0f;
+
+    [Header("Boost Amount Settings")]
+    [Tooltip("Boost-Zuwachs bei schnellster moeglicher Sprungfolge (fastestJumpInterval)")]
+    public float maxBoostPerJump = 0.4f;
+    [Tooltip("Boost-Zuwachs bei langsamster noch zaehlender Sprungfolge (slowestJumpInterval)")]
+    public float minBoostPerJump = 0.05f;
+    [Tooltip("Maximaler Gesamt-Speed-Multiplier")]
     public float maxComboMultiplier = 3.0f;
-    [Tooltip("Zeitfenster nach einem Walljump, in dem der nächste Walljump die Combo fortsetzt")]
-    public float comboWindow = 1.0f;
 
     [Header("Decay Settings")]
-    [Tooltip("Wie lange der aktuelle Multiplier nach dem letzten Walljump aktiv bleibt, bevor er abgebaut wird")]
+    [Tooltip("Wie lange der Multiplier nach dem letzten Jump aktiv bleibt, bevor er abgebaut wird")]
     public float boostHoldDuration = 1.0f;
-    [Tooltip("Wie schnell der Multiplier nach Ablauf der Hold-Zeit auf 1.0 zurückfällt (pro Sekunde)")]
+    [Tooltip("Wie schnell der Multiplier nach Ablauf der Hold-Zeit auf 1.0 zurueckfaellt (pro Sekunde)")]
     public float decayRate = 2.0f;
 
     private SC_FPSController fpsController;
 
     private float currentSpeedMultiplier = 1.0f;
-    private float lastWallJumpTime = -999f;
+    private float lastTakeoffTime = -999f;
     private float holdTimer = 0f;
 
     private float originalWalkingSpeed;
@@ -62,27 +68,41 @@ public class VelocityMultiplier : MonoBehaviour
         }
     }
 
-    public void OnWallJump()
+    // Wird von SC_FPSController in dem Moment aufgerufen, in dem der Spieler abspringt
+    // (normaler Jump und Walljump). Das gemessene Intervall ist die Airtime seit dem
+    // VORHERIGEN Absprung -- nicht die Zeit seit dem letzten Methodenaufruf an sich,
+    // sondern bewusst die Luftzeit, damit hohe Geschwindigkeit (= weitere/laengere
+    // Spruenge) den Boost nicht kuenstlich frueh capt.
+    public void OnJumpAction()
     {
-        bool isComboContinuing = (Time.time - lastWallJumpTime) <= comboWindow;
+        float airtime = Time.time - lastTakeoffTime;
+        holdTimer = 0f;
 
-        if (isComboContinuing)
+        bool isFastEnoughToCount = airtime <= slowestJumpInterval;
+
+        if (!isFastEnoughToCount)
         {
-            currentSpeedMultiplier += comboBoostPerJump;
+            // Airtime war zu lang -> Combo beginnt neu, kein Boost diesmal
+            currentSpeedMultiplier = 1.0f;
+            ApplySpeedBoost();
+            Debug.Log("Jump Combo Reset (Airtime zu lang)");
         }
         else
         {
-            currentSpeedMultiplier = 1.0f + comboBoostPerJump;
+            // Je kuerzer die Airtime, desto naeher an maxBoostPerJump
+            float normalizedTempo = Mathf.InverseLerp(slowestJumpInterval, fastestJumpInterval, airtime);
+            float boostThisJump = Mathf.Lerp(minBoostPerJump, maxBoostPerJump, normalizedTempo);
+
+            currentSpeedMultiplier += boostThisJump;
+            currentSpeedMultiplier = Mathf.Clamp(currentSpeedMultiplier, 1.0f, maxComboMultiplier);
+
+            ApplySpeedBoost();
+
+            Debug.Log($"Jump! Airtime: {airtime:F2}s | Boost: +{boostThisJump:F2} | Multiplier: {currentSpeedMultiplier:F2}x");
         }
 
-        currentSpeedMultiplier = Mathf.Clamp(currentSpeedMultiplier, 1.0f, maxComboMultiplier);
-
-        lastWallJumpTime = Time.time;
-        holdTimer = 0f;
-
-        ApplySpeedBoost();
-
-        Debug.Log($"Wall Jump Combo! Multiplier: {currentSpeedMultiplier:F2}x");
+        // Zeitpunkt DIESES Absprungs merken -> Basis fuer die Airtime-Messung beim naechsten Jump
+        lastTakeoffTime = Time.time;
     }
 
     void ApplySpeedBoost()
@@ -104,7 +124,7 @@ public class VelocityMultiplier : MonoBehaviour
 
         currentSpeedMultiplier = 1.0f;
         holdTimer = 0f;
-        lastWallJumpTime = -999f;
+        lastTakeoffTime = -999f;
 
         if (fpsController != null)
         {
@@ -117,7 +137,7 @@ public class VelocityMultiplier : MonoBehaviour
     {
         if (currentSpeedMultiplier > 1.0f)
         {
-            GUI.Label(new Rect(10, 40, 500, 20), $"Wall Jump Combo: {currentSpeedMultiplier:F2}x");
+            GUI.Label(new Rect(10, 40, 500, 20), $"Jump Combo: {currentSpeedMultiplier:F2}x");
         }
     }
 }
