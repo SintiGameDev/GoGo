@@ -1,17 +1,20 @@
 /* ============================================================
    TimerHUD.uss
    Styling für das Speedrun-Timer HUD (UI Toolkit).
-   Dunkles, leicht transparentes Panel mit Glow-Akzenten für
-   die Medal-Farben. Keine externen Texturen nötig.
+   Zeigt die Live-Zeit + genau EIN nächstes Ziel (Diamant > Gold >
+   Silber > Bronze). Feste Breiten verhindern Re-Layout-Flackern.
    ============================================================ */
 
 :root {
     --color-bg-panel: rgba(18, 20, 26, 0.78);
-    --color-bg-row: rgba(255, 255, 255, 0.04);
-    --color-bg-row-active: rgba(255, 255, 255, 0.09);
+    --color-bg-row: rgba(255, 255, 255, 0.05);
+    --color-bg-row-reached: rgba(80, 220, 130, 0.12);
+
     --color-text-main: rgb(240, 240, 245);
     --color-text-dim: rgba(240, 240, 245, 0.45);
 
+    --color-diamond: rgb(120, 224, 255);
+    --color-diamond-dark: rgb(48, 140, 168);
     --color-gold: rgb(255, 209, 71);
     --color-gold-dark: rgb(168, 126, 22);
     --color-silver: rgb(214, 220, 226);
@@ -24,7 +27,7 @@
     position: absolute;
     top: 24px;
     right: 24px;
-    width: 280px;
+    width: 240px;
 }
 
 /* ---------- Haupt-Panel ---------- */
@@ -41,7 +44,7 @@
 
 .time-display-container {
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
 }
 
 .time-label-small {
@@ -52,11 +55,17 @@
     margin-bottom: 2px;
 }
 
+/* Feste Breite/Höhe verhindert, dass sich das Label-Layout bei
+   jedem Frame durch wechselnde Glyphenbreiten minimal verschiebt
+   ("Vibrieren" durch Re-Layout der Eltern-Container). */
 .time-value {
-    font-size: 42px;
+    font-size: 40px;
     color: var(--color-text-main);
     -unity-font-style: bold;
     -unity-text-align: middle-center;
+    width: 100%;
+    min-width: 200px;
+    height: 50px;
 }
 
 .divider {
@@ -66,41 +75,32 @@
     margin-top: 4px;
 }
 
-/* ---------- Medal-Zeilen ---------- */
+/* ---------- Nächstes-Ziel Zeile (einzige Medal-Zeile) ---------- */
 
-.medal-row {
+.target-row {
     flex-direction: row;
     align-items: center;
     background-color: var(--color-bg-row);
     border-radius: 8px;
-    padding: 8px 10px;
-    margin-bottom: 6px;
-    transition-property: background-color, scale;
-    transition-duration: 0.15s;
+    padding: 10px 12px;
+    /* Bewusst KEINE transition auf background-color/scale hier:
+       Transitions + ständiges Re-Setzen pro Frame sind die
+       Hauptursache für sichtbares Flackern/Vibrieren. */
 }
 
-.medal-row:last-child {
-    margin-bottom: 0;
-}
-
-.medal-row--active {
-    background-color: var(--color-bg-row-active);
-    scale: 1.02 1.02;
-}
-
-.medal-row--missed {
-    opacity: 0.4;
+.target-row--reached {
+    background-color: var(--color-bg-row-reached);
 }
 
 /* ---------- Medaillen-Icon (rein über USS, kein Sprite) ---------- */
 
 .medal-icon {
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     border-width: 2px;
-    margin-right: 10px;
-    -unity-background-scale-mode: scale-to-fit;
+    margin-right: 12px;
+    flex-shrink: 0;
     align-items: center;
     justify-content: center;
 }
@@ -109,7 +109,22 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.5);
+    background-color: rgba(255, 255, 255, 0.55);
+}
+
+/* Diamant bekommt eine Raute statt Kreis als Innen-Symbol, wirkt
+   kristalliner und hebt sich klar von den Metall-Medaillen ab. */
+.medal-icon--diamond .medal-icon-inner {
+    width: 11px;
+    height: 11px;
+    border-radius: 2px;
+    rotate: 45deg;
+    background-color: rgba(255, 255, 255, 0.85);
+}
+
+.medal-icon--diamond {
+    background-color: var(--color-diamond);
+    border-color: var(--color-diamond-dark);
 }
 
 .medal-icon--gold {
@@ -132,54 +147,46 @@
     border-color: rgba(255, 255, 255, 0.15);
 }
 
-/* Glow-Effekt wenn Medal aktiv erreichbar/erreicht ist */
-.medal-icon--glow-gold {
-    border-width: 2px;
-    border-color: var(--color-gold);
-}
-
-.medal-icon--glow-silver {
-    border-width: 2px;
-    border-color: var(--color-silver);
-}
-
-.medal-icon--glow-bronze {
-    border-width: 2px;
-    border-color: var(--color-bronze);
-}
-
-/* ---------- Medal-Text-Block ---------- */
+/* ---------- Text-Block neben dem Icon ---------- */
 
 .medal-text-block {
     flex-direction: column;
     flex-grow: 1;
 }
 
+.target-label-small {
+    font-size: 10px;
+    color: var(--color-text-dim);
+    letter-spacing: 1.5px;
+    -unity-font-style: bold;
+}
+
 .medal-name {
-    font-size: 13px;
+    font-size: 15px;
     -unity-font-style: bold;
     color: var(--color-text-main);
 }
+
+.medal-name--diamond { color: var(--color-diamond); }
+.medal-name--gold { color: var(--color-gold); }
+.medal-name--silver { color: var(--color-silver); }
+.medal-name--bronze { color: var(--color-bronze); }
 
 .medal-target-time {
     font-size: 12px;
     color: var(--color-text-dim);
 }
 
-.medal-name--gold { color: var(--color-gold); }
-.medal-name--silver { color: var(--color-silver); }
-.medal-name--bronze { color: var(--color-bronze); }
-
 /* ---------- Checkmark ---------- */
 
 .medal-check {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     background-color: rgba(255, 255, 255, 0.08);
     align-items: center;
     justify-content: center;
-    -unity-font-style: bold;
+    flex-shrink: 0;
 }
 
 .medal-check-label {
@@ -237,6 +244,19 @@
     border-radius: 50%;
     border-width: 4px;
     margin-bottom: 16px;
+    align-items: center;
+    justify-content: center;
+}
+
+.result-medal-icon .medal-icon-inner {
+    width: 28px;
+    height: 28px;
+}
+
+.result-medal-icon.medal-icon--diamond .medal-icon-inner {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
 }
 
 .result-time {

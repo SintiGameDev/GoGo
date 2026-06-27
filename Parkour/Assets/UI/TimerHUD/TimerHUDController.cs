@@ -4,7 +4,11 @@ using UnityEngine.UIElements;
 /// <summary>
 /// Bindet das TimerHUD.uxml an den TimerController. Benötigt ein UIDocument mit
 /// zugewiesenem TimerHUD.uxml als Source Asset auf demselben GameObject.
-/// Kein manuelles Verschieben von TMPro-Objekten nötig - Layout kommt komplett aus UXML/USS.
+///
+/// Zeigt die Live-Zeit + genau EIN "nächstes Ziel" (Diamant > Gold > Silber > Bronze)
+/// an, statt aller Stufen gleichzeitig. Reagiert nur auf TimerController.OnNextTargetChanged
+/// statt jeden Frame USS-Klassen umzuschalten - das war die Ursache für das Flackern/
+/// Vibrieren (ständiges Re-Layout durch Klassen-Toggles + Transitions bei jedem Frame).
 /// </summary>
 [RequireComponent(typeof(UIDocument))]
 public class TimerHUDController : MonoBehaviour
@@ -14,7 +18,6 @@ public class TimerHUDController : MonoBehaviour
     public TimerController timerController;
 
     [Header("Result-Overlay")]
-    [Tooltip("Wie lange das Result-Overlay nach Zielankunft sichtbar bleibt, bevor SceneDirector übernimmt (rein optisch, blockiert nichts)")]
     public bool showResultOverlay = true;
 
     [Header("Debug")]
@@ -26,16 +29,21 @@ public class TimerHUDController : MonoBehaviour
     // HUD-Elemente
     private Label currentTimeLabel;
 
-    private VisualElement goldRow, silverRow, bronzeRow;
-    private VisualElement goldIcon, silverIcon, bronzeIcon;
-    private VisualElement goldCheck, silverCheck, bronzeCheck;
-    private Label goldTargetLabel, silverTargetLabel, bronzeTargetLabel;
+    private VisualElement targetRow;
+    private VisualElement targetIcon;
+    private Label targetNameLabel;
+    private Label targetTimeLabel;
+    private VisualElement targetCheck;
 
     // Result-Overlay-Elemente
     private VisualElement resultOverlay;
     private VisualElement resultMedalIcon;
     private Label resultTimeLabel;
     private Label resultMedalNameLabel;
+
+    // Cache, um das Zeit-Label nur zu aktualisieren wenn sich der angezeigte
+    // Text tatsächlich ändert (vermeidet unnötige Re-Layout-Passes pro Frame)
+    private string lastDisplayedTime = "";
 
     void Awake()
     {
@@ -57,21 +65,11 @@ public class TimerHUDController : MonoBehaviour
     {
         currentTimeLabel = root.Q<Label>("current-time-label");
 
-        goldRow = root.Q<VisualElement>("gold-row");
-        silverRow = root.Q<VisualElement>("silver-row");
-        bronzeRow = root.Q<VisualElement>("bronze-row");
-
-        goldIcon = root.Q<VisualElement>("gold-icon");
-        silverIcon = root.Q<VisualElement>("silver-icon");
-        bronzeIcon = root.Q<VisualElement>("bronze-icon");
-
-        goldCheck = root.Q<VisualElement>("gold-check");
-        silverCheck = root.Q<VisualElement>("silver-check");
-        bronzeCheck = root.Q<VisualElement>("bronze-check");
-
-        goldTargetLabel = root.Q<Label>("gold-target-label");
-        silverTargetLabel = root.Q<Label>("silver-target-label");
-        bronzeTargetLabel = root.Q<Label>("bronze-target-label");
+        targetRow = root.Q<VisualElement>("target-row");
+        targetIcon = root.Q<VisualElement>("target-icon");
+        targetNameLabel = root.Q<Label>("target-name-label");
+        targetTimeLabel = root.Q<Label>("target-time-label");
+        targetCheck = root.Q<VisualElement>("target-check");
 
         resultOverlay = root.Q<VisualElement>("result-overlay");
         resultMedalIcon = root.Q<VisualElement>("result-medal-icon");
@@ -80,8 +78,8 @@ public class TimerHUDController : MonoBehaviour
 
         if (showDebugInfo)
         {
-            bool allFound = currentTimeLabel != null && goldRow != null && silverRow != null &&
-                             bronzeRow != null && resultOverlay != null;
+            bool allFound = currentTimeLabel != null && targetRow != null &&
+                             targetIcon != null && resultOverlay != null;
 
             Debug.Log(allFound
                 ? "✅ TimerHUDController: Alle UXML-Elemente erfolgreich gefunden."
@@ -96,6 +94,7 @@ public class TimerHUDController : MonoBehaviour
             timerController.OnTimeUpdated += HandleTimeUpdated;
             timerController.OnTimerStopped += HandleTimerStopped;
             timerController.OnTimerReset += HandleTimerReset;
+            timerController.OnNextTargetChanged += HandleNextTargetChanged;
         }
     }
 
@@ -106,89 +105,142 @@ public class TimerHUDController : MonoBehaviour
             timerController.OnTimeUpdated -= HandleTimeUpdated;
             timerController.OnTimerStopped -= HandleTimerStopped;
             timerController.OnTimerReset -= HandleTimerReset;
+            timerController.OnNextTargetChanged -= HandleNextTargetChanged;
         }
     }
 
     void Start()
     {
-        if (timerController == null)
-            return;
-
-        SetTargetLabel(goldTargetLabel, timerController.goldTime);
-        SetTargetLabel(silverTargetLabel, timerController.silverTime);
-        SetTargetLabel(bronzeTargetLabel, timerController.bronzeTime);
-
         if (resultOverlay != null)
             resultOverlay.RemoveFromClassList("result-overlay--visible");
 
+        if (timerController == null)
+            return;
+
         HandleTimeUpdated(timerController.GetElapsedTime());
+        HandleNextTargetChanged(
+            timerController.GetNextTargetRank(),
+            timerController.GetTimeForRank(timerController.GetNextTargetRank()),
+            timerController.GetElapsedTime() <= timerController.GetTimeForRank(timerController.GetNextTargetRank())
+        );
     }
 
-    void SetTargetLabel(Label label, float time)
-    {
-        if (label != null)
-            label.text = $"< {TimerController.FormatTime(time)}";
-    }
-
-    // ---------------- Live-Updates ----------------
+    // ---------------- Live-Updates (läuft jeden Frame, aber sehr leichtgewichtig) ----------------
 
     void HandleTimeUpdated(float elapsedTime)
     {
-        if (currentTimeLabel != null)
-            currentTimeLabel.text = TimerController.FormatTime(elapsedTime);
-
-        if (timerController == null || timerController.HasFinished())
+        if (currentTimeLabel == null)
             return;
 
-        UpdateRowState(goldRow, goldCheck, elapsedTime <= timerController.goldTime);
-        UpdateRowState(silverRow, silverCheck, elapsedTime <= timerController.silverTime);
-        UpdateRowState(bronzeRow, bronzeCheck, elapsedTime <= timerController.bronzeTime);
+        string formatted = TimerController.FormatTime(elapsedTime);
+
+        // Nur schreiben, wenn sich der Text wirklich geändert hat. .text setzen
+        // löst auch bei identischem Wert intern ein Re-Layout aus - das war
+        // mit ein Faktor für das wahrgenommene "Vibrieren".
+        if (formatted != lastDisplayedTime)
+        {
+            currentTimeLabel.text = formatted;
+            lastDisplayedTime = formatted;
+        }
     }
 
-    void UpdateRowState(VisualElement row, VisualElement check, bool reached)
-    {
-        if (row != null)
-            row.EnableInClassList("medal-row--active", reached);
+    // ---------------- Nächstes Ziel wechselt (selten, nicht pro Frame) ----------------
 
-        if (check != null)
-            check.EnableInClassList("medal-check--done", reached);
+    void HandleNextTargetChanged(TimerController.MedalRank rank, float targetTime, bool alreadyReached)
+    {
+        if (showDebugInfo)
+            Debug.Log($"🎯 TimerHUDController: Neues Ziel = {rank} (< {TimerController.FormatTime(targetTime)})");
+
+        ApplyTargetVisuals(rank);
+
+        if (targetTimeLabel != null)
+            targetTimeLabel.text = $"< {TimerController.FormatTime(targetTime)}";
+
+        if (targetRow != null)
+            targetRow.EnableInClassList("target-row--reached", alreadyReached);
+
+        if (targetCheck != null)
+            targetCheck.EnableInClassList("medal-check--done", alreadyReached);
+    }
+
+    void ApplyTargetVisuals(TimerController.MedalRank rank)
+    {
+        string rankLabel = rank switch
+        {
+            TimerController.MedalRank.Diamond => "Diamant",
+            TimerController.MedalRank.Gold => "Gold",
+            TimerController.MedalRank.Silver => "Silber",
+            TimerController.MedalRank.Bronze => "Bronze",
+            _ => "Bronze"
+        };
+
+        if (targetNameLabel != null)
+        {
+            targetNameLabel.text = rankLabel;
+            SetRankClass(targetNameLabel, "medal-name", rank);
+        }
+
+        if (targetIcon != null)
+        {
+            SetRankClass(targetIcon, "medal-icon", rank);
+        }
+    }
+
+    /// <summary>
+    /// Entfernt alle bekannten Rank-Suffix-Klassen von einem Element und setzt
+    /// die passende neu (z.B. "medal-icon--diamond"). Hält Diamond/Gold/Silber/Bronze
+    /// konsistent zwischen Icon und Label.
+    /// </summary>
+    void SetRankClass(VisualElement element, string baseClass, TimerController.MedalRank rank)
+    {
+        element.RemoveFromClassList($"{baseClass}--diamond");
+        element.RemoveFromClassList($"{baseClass}--gold");
+        element.RemoveFromClassList($"{baseClass}--silver");
+        element.RemoveFromClassList($"{baseClass}--bronze");
+        element.RemoveFromClassList($"{baseClass}--inactive");
+
+        string suffix = rank switch
+        {
+            TimerController.MedalRank.Diamond => "diamond",
+            TimerController.MedalRank.Gold => "gold",
+            TimerController.MedalRank.Silver => "silver",
+            TimerController.MedalRank.Bronze => "bronze",
+            _ => "inactive"
+        };
+
+        element.AddToClassList($"{baseClass}--{suffix}");
     }
 
     // ---------------- Finaler Abschluss ----------------
 
-    void HandleTimerStopped(float finalTime, TimerController.MedalRank rank)
+    void HandleTimerStopped(float finalTime, TimerController.MedalRank finalRank)
     {
         if (showDebugInfo)
-            Debug.Log($"🏁 TimerHUDController: HUD finalisiert für {TimerController.FormatTime(finalTime)} ({rank})");
+            Debug.Log($"🏁 TimerHUDController: HUD finalisiert für {TimerController.FormatTime(finalTime)} ({finalRank})");
 
+        string formatted = TimerController.FormatTime(finalTime);
         if (currentTimeLabel != null)
-            currentTimeLabel.text = TimerController.FormatTime(finalTime);
+            currentTimeLabel.text = formatted;
 
-        bool gotBronze = rank == TimerController.MedalRank.Bronze ||
-                          rank == TimerController.MedalRank.Silver ||
-                          rank == TimerController.MedalRank.Gold;
-        bool gotSilver = rank == TimerController.MedalRank.Silver ||
-                          rank == TimerController.MedalRank.Gold;
-        bool gotGold = rank == TimerController.MedalRank.Gold;
+        bool reachedAnything = finalRank != TimerController.MedalRank.None;
 
-        FinalizeRow(bronzeRow, bronzeCheck, gotBronze);
-        FinalizeRow(silverRow, silverCheck, gotSilver);
-        FinalizeRow(goldRow, goldCheck, gotGold);
+        if (targetRow != null)
+            targetRow.EnableInClassList("target-row--reached", reachedAnything);
+
+        if (targetCheck != null)
+            targetCheck.EnableInClassList("medal-check--done", reachedAnything);
+
+        // Zielzeile zeigt final die tatsächlich erreichte (oder knapp verpasste) Stufe
+        ApplyTargetVisuals(finalRank == TimerController.MedalRank.None ? TimerController.MedalRank.Bronze : finalRank);
+
+        if (targetNameLabel != null && finalRank == TimerController.MedalRank.None)
+            targetNameLabel.text = "Keine Medaille";
+
+        if (targetTimeLabel != null)
+            targetTimeLabel.text = $"Endzeit: {formatted}";
 
         if (showResultOverlay)
-            ShowResult(finalTime, rank);
-    }
-
-    void FinalizeRow(VisualElement row, VisualElement check, bool reached)
-    {
-        if (row == null)
-            return;
-
-        row.EnableInClassList("medal-row--active", reached);
-        row.EnableInClassList("medal-row--missed", !reached);
-
-        if (check != null)
-            check.EnableInClassList("medal-check--done", reached);
+            ShowResult(finalTime, finalRank);
     }
 
     void ShowResult(float finalTime, TimerController.MedalRank rank)
@@ -203,6 +255,7 @@ public class TimerHUDController : MonoBehaviour
 
         string rankLabel = rank switch
         {
+            TimerController.MedalRank.Diamond => "Diamant",
             TimerController.MedalRank.Gold => "Gold",
             TimerController.MedalRank.Silver => "Silber",
             TimerController.MedalRank.Bronze => "Bronze",
@@ -212,46 +265,12 @@ public class TimerHUDController : MonoBehaviour
         if (resultMedalNameLabel != null)
         {
             resultMedalNameLabel.text = rankLabel;
-            resultMedalNameLabel.RemoveFromClassList("medal-name--gold");
-            resultMedalNameLabel.RemoveFromClassList("medal-name--silver");
-            resultMedalNameLabel.RemoveFromClassList("medal-name--bronze");
-
-            switch (rank)
-            {
-                case TimerController.MedalRank.Gold:
-                    resultMedalNameLabel.AddToClassList("medal-name--gold");
-                    break;
-                case TimerController.MedalRank.Silver:
-                    resultMedalNameLabel.AddToClassList("medal-name--silver");
-                    break;
-                case TimerController.MedalRank.Bronze:
-                    resultMedalNameLabel.AddToClassList("medal-name--bronze");
-                    break;
-            }
+            SetRankClass(resultMedalNameLabel, "medal-name", rank);
         }
 
         if (resultMedalIcon != null)
         {
-            resultMedalIcon.RemoveFromClassList("medal-icon--inactive");
-            resultMedalIcon.RemoveFromClassList("medal-icon--gold");
-            resultMedalIcon.RemoveFromClassList("medal-icon--silver");
-            resultMedalIcon.RemoveFromClassList("medal-icon--bronze");
-
-            switch (rank)
-            {
-                case TimerController.MedalRank.Gold:
-                    resultMedalIcon.AddToClassList("medal-icon--gold");
-                    break;
-                case TimerController.MedalRank.Silver:
-                    resultMedalIcon.AddToClassList("medal-icon--silver");
-                    break;
-                case TimerController.MedalRank.Bronze:
-                    resultMedalIcon.AddToClassList("medal-icon--bronze");
-                    break;
-                default:
-                    resultMedalIcon.AddToClassList("medal-icon--inactive");
-                    break;
-            }
+            SetRankClass(resultMedalIcon, "medal-icon", rank);
         }
     }
 
@@ -259,26 +278,18 @@ public class TimerHUDController : MonoBehaviour
 
     void HandleTimerReset()
     {
+        lastDisplayedTime = "";
+
         if (currentTimeLabel != null)
             currentTimeLabel.text = TimerController.FormatTime(0f);
 
-        ResetRow(goldRow, goldCheck);
-        ResetRow(silverRow, silverCheck);
-        ResetRow(bronzeRow, bronzeCheck);
+        if (targetRow != null)
+            targetRow.RemoveFromClassList("target-row--reached");
+
+        if (targetCheck != null)
+            targetCheck.RemoveFromClassList("medal-check--done");
 
         if (resultOverlay != null)
             resultOverlay.RemoveFromClassList("result-overlay--visible");
-    }
-
-    void ResetRow(VisualElement row, VisualElement check)
-    {
-        if (row != null)
-        {
-            row.RemoveFromClassList("medal-row--active");
-            row.RemoveFromClassList("medal-row--missed");
-        }
-
-        if (check != null)
-            check.RemoveFromClassList("medal-check--done");
     }
 }

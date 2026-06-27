@@ -13,10 +13,14 @@ public class TimerController : MonoBehaviour
         None,
         Bronze,
         Silver,
-        Gold
+        Gold,
+        Diamond
     }
 
     [Header("Medal Zeiten (in Sekunden)")]
+    [Tooltip("Zeit, die für Diamant unterschritten werden muss (höchste Stufe)")]
+    public float diamondTime = 20f;
+
     [Tooltip("Zeit, die für Gold unterschritten werden muss")]
     public float goldTime = 30f;
 
@@ -41,10 +45,18 @@ public class TimerController : MonoBehaviour
     public event Action<float, MedalRank> OnTimerStopped;
     public event Action OnTimerReset;
 
+    /// <summary>
+    /// Wird gefeuert, sobald sich das aktuell anzuvisierende nächste Ziel ändert
+    /// (z.B. weil Bronze gerade erreicht wurde und jetzt Silber das neue Ziel ist).
+    /// Übergibt: das Ziel-Rank, die Ziel-Zeit, und ob dieses Ziel bereits erreicht ist.
+    /// </summary>
+    public event Action<MedalRank, float, bool> OnNextTargetChanged;
+
     private float elapsedTime = 0f;
     private bool isRunning = false;
     private bool hasFinished = false;
     private MedalRank finalRank = MedalRank.None;
+    private MedalRank currentNextTarget = MedalRank.None;
 
     void Start()
     {
@@ -61,6 +73,57 @@ public class TimerController : MonoBehaviour
 
         elapsedTime += Time.deltaTime;
         OnTimeUpdated?.Invoke(elapsedTime);
+
+        CheckNextTargetChanged();
+    }
+
+    /// <summary>
+    /// Prüft, ob sich das anzuvisierende nächste Ziel geändert hat, und feuert das Event
+    /// nur in diesem Fall (verhindert unnötiges UI-Re-Layout/Flackern bei jedem Frame).
+    /// </summary>
+    void CheckNextTargetChanged()
+    {
+        MedalRank newTarget = GetNextTargetRank();
+
+        if (newTarget != currentNextTarget)
+        {
+            currentNextTarget = newTarget;
+            float targetTime = GetTimeForRank(newTarget);
+            bool alreadyReached = elapsedTime <= targetTime;
+            OnNextTargetChanged?.Invoke(newTarget, targetTime, alreadyReached);
+        }
+    }
+
+    /// <summary>
+    /// Ermittelt die aktuell relevante "nächste" Zielstufe relativ zur Laufzeit.
+    /// Ist Diamant (beste Stufe) schon erreicht, bleibt Diamant das angezeigte Ziel.
+    /// </summary>
+    public MedalRank GetNextTargetRank()
+    {
+        if (elapsedTime <= diamondTime)
+            return MedalRank.Diamond;
+        if (elapsedTime <= goldTime)
+            return MedalRank.Gold;
+        if (elapsedTime <= silverTime)
+            return MedalRank.Silver;
+        if (elapsedTime <= bronzeTime)
+            return MedalRank.Bronze;
+
+        // Keine Stufe mehr erreichbar: nächstes "Ziel" bleibt informativ Bronze
+        // (zeigt wie weit man von der niedrigsten Medal entfernt ist)
+        return MedalRank.Bronze;
+    }
+
+    public float GetTimeForRank(MedalRank rank)
+    {
+        switch (rank)
+        {
+            case MedalRank.Diamond: return diamondTime;
+            case MedalRank.Gold: return goldTime;
+            case MedalRank.Silver: return silverTime;
+            case MedalRank.Bronze: return bronzeTime;
+            default: return bronzeTime;
+        }
     }
 
     /// <summary>
@@ -76,6 +139,7 @@ public class TimerController : MonoBehaviour
         }
 
         isRunning = true;
+        CheckNextTargetChanged();
 
         if (showDebugInfo)
             Debug.Log("⏱️ TimerController: Timer gestartet");
@@ -125,9 +189,11 @@ public class TimerController : MonoBehaviour
         isRunning = false;
         hasFinished = false;
         finalRank = MedalRank.None;
+        currentNextTarget = MedalRank.None;
 
         OnTimerReset?.Invoke();
         OnTimeUpdated?.Invoke(elapsedTime);
+        CheckNextTargetChanged();
 
         if (showDebugInfo)
             Debug.Log("🔄 TimerController: Timer zurückgesetzt");
@@ -138,6 +204,8 @@ public class TimerController : MonoBehaviour
     /// </summary>
     public MedalRank EvaluateMedal(float time)
     {
+        if (time <= diamondTime)
+            return MedalRank.Diamond;
         if (time <= goldTime)
             return MedalRank.Gold;
         if (time <= silverTime)
@@ -157,6 +225,8 @@ public class TimerController : MonoBehaviour
 
         switch (rank)
         {
+            case MedalRank.Diamond:
+                return timeToCheck <= diamondTime;
             case MedalRank.Gold:
                 return timeToCheck <= goldTime;
             case MedalRank.Silver:

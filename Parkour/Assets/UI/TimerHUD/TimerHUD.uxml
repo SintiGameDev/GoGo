@@ -15,45 +15,20 @@
 
             <ui:VisualElement name="divider" class="divider" />
 
-            <!-- Gold Zeile -->
-            <ui:VisualElement name="gold-row" class="medal-row">
-                <ui:VisualElement name="gold-icon" class="medal-icon medal-icon--gold">
-                    <ui:VisualElement name="gold-icon-inner" class="medal-icon-inner" />
+            <!-- Nächstes Ziel - einzige Zeile, Inhalt wird per Script ausgetauscht -->
+            <ui:VisualElement name="target-row" class="target-row">
+                <ui:VisualElement name="target-icon" class="medal-icon medal-icon--diamond">
+                    <ui:VisualElement name="target-icon-inner" class="medal-icon-inner" />
                 </ui:VisualElement>
-                <ui:VisualElement name="gold-text-block" class="medal-text-block">
-                    <ui:Label name="gold-name-label" text="Gold" class="medal-name medal-name--gold" />
-                    <ui:Label name="gold-target-label" text="&lt; 00:30.00" class="medal-target-time" />
+                <ui:VisualElement name="target-text-block" class="medal-text-block">
+                    <ui:Label name="target-label-small" text="NÄCHSTES ZIEL" class="target-label-small" />
+                    <ui:Label name="target-name-label" text="Diamant" class="medal-name medal-name--diamond" />
                 </ui:VisualElement>
-                <ui:VisualElement name="gold-check" class="medal-check">
-                    <ui:Label name="gold-check-label" text="✓" class="medal-check-label" />
+                <ui:VisualElement name="target-text-right" class="medal-text-block" style="flex-grow: 0; align-items: flex-end;">
+                    <ui:Label name="target-time-label" text="&lt; 00:20.00" class="medal-target-time" />
                 </ui:VisualElement>
-            </ui:VisualElement>
-
-            <!-- Silber Zeile -->
-            <ui:VisualElement name="silver-row" class="medal-row">
-                <ui:VisualElement name="silver-icon" class="medal-icon medal-icon--silver">
-                    <ui:VisualElement name="silver-icon-inner" class="medal-icon-inner" />
-                </ui:VisualElement>
-                <ui:VisualElement name="silver-text-block" class="medal-text-block">
-                    <ui:Label name="silver-name-label" text="Silber" class="medal-name medal-name--silver" />
-                    <ui:Label name="silver-target-label" text="&lt; 00:45.00" class="medal-target-time" />
-                </ui:VisualElement>
-                <ui:VisualElement name="silver-check" class="medal-check">
-                    <ui:Label name="silver-check-label" text="✓" class="medal-check-label" />
-                </ui:VisualElement>
-            </ui:VisualElement>
-
-            <!-- Bronze Zeile -->
-            <ui:VisualElement name="bronze-row" class="medal-row">
-                <ui:VisualElement name="bronze-icon" class="medal-icon medal-icon--bronze">
-                    <ui:VisualElement name="bronze-icon-inner" class="medal-icon-inner" />
-                </ui:VisualElement>
-                <ui:VisualElement name="bronze-text-block" class="medal-text-block">
-                    <ui:Label name="bronze-name-label" text="Bronze" class="medal-name medal-name--bronze" />
-                    <ui:Label name="bronze-target-label" text="&lt; 01:00.00" class="medal-target-time" />
-                </ui:VisualElement>
-                <ui:VisualElement name="bronze-check" class="medal-check">
-                    <ui:Label name="bronze-check-label" text="✓" class="medal-check-label" />
+                <ui:VisualElement name="target-check" class="medal-check">
+                    <ui:Label name="target-check-label" text="✓" class="medal-check-label" />
                 </ui:VisualElement>
             </ui:VisualElement>
 
@@ -63,7 +38,9 @@
         <ui:VisualElement name="result-overlay" class="result-overlay">
             <ui:VisualElement name="result-card" class="result-card">
                 <ui:Label name="result-title-label" text="ZIEL ERREICHT" class="result-title" />
-                <ui:VisualElement name="result-medal-icon" class="result-medal-icon medal-icon--inactive" />
+                <ui:VisualElement name="result-medal-icon" class="result-medal-icon medal-icon--inactive">
+                    <ui:VisualElement name="result-medal-icon-inner" class="medal-icon-inner" />
+                </ui:VisualElement>
                 <ui:Label name="result-time-label" text="00:00.00" class="result-time" />
                 <ui:Label name="result-medal-name-label" text="Keine Medaille" class="result-medal-name" />
             </ui:VisualElement>
