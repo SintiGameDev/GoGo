@@ -25,6 +25,7 @@ public class VelocityMultiplier : MonoBehaviour
     public float decayRate = 2.0f;
 
     private SC_FPSController fpsController;
+    private CharacterController characterController;
 
     private float currentSpeedMultiplier = 1.0f;
     private float lastTakeoffTime = -999f;
@@ -36,6 +37,7 @@ public class VelocityMultiplier : MonoBehaviour
     void Start()
     {
         fpsController = GetComponent<SC_FPSController>();
+        characterController = GetComponent<CharacterController>();
 
         if (fpsController == null)
         {
@@ -51,7 +53,11 @@ public class VelocityMultiplier : MonoBehaviour
     {
         if (fpsController == null) return;
 
-        if (currentSpeedMultiplier > 1.0f)
+        bool isGrounded = characterController == null || characterController.isGrounded;
+
+        // Kein Decay waehrend der Spieler in der Luft ist -- der Boost soll den
+        // gesamten Sprung ueber erhalten bleiben, unabhaengig von der Airtime.
+        if (currentSpeedMultiplier > 1.0f && isGrounded)
         {
             holdTimer += Time.deltaTime;
 

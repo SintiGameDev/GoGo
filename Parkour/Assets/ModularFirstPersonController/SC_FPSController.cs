@@ -27,10 +27,7 @@ public class SC_FPSController : MonoBehaviour
     public float fovChangeDuration = 0.3f;
     public float fovSpeedThreshold = 15f;
 
-    // Momentum Preservation (z.B. nach Walljump-Landung)
-    [Header("Momentum Preservation")]
-    public bool preserveHorizontalMomentumOnLanding = true;
-    public float landingMomentumRetention = 0.85f;
+    [Header("Speed Settings")]
     public float speedTransitionRate = 10f;
 
     CharacterController characterController;
@@ -55,9 +52,7 @@ public class SC_FPSController : MonoBehaviour
     private float lastGroundedTime = 0f;
     private bool wasGroundedLastFrame = false;
 
-    // Velocity Preservation State
-    private Vector3 lastVelocity = Vector3.zero;
-    private Vector3 preservedHorizontalVelocity = Vector3.zero;
+    // Speed State
     private float targetWalkingSpeed;
     private float targetRunningSpeed;
     private float currentSmoothWalkSpeed;
@@ -145,18 +140,7 @@ public class SC_FPSController : MonoBehaviour
 
         float movementDirectionY = moveDirection.y;
 
-        // Momentum Preservation
-        if (preserveHorizontalMomentumOnLanding && preservedHorizontalVelocity.magnitude > 0.1f)
-        {
-            Vector3 inputDirection = (forward * curSpeedX) + (right * curSpeedY);
-            float preservedInfluence = Mathf.Clamp01(preservedHorizontalVelocity.magnitude / walkingSpeed);
-            moveDirection = Vector3.Lerp(inputDirection, preservedHorizontalVelocity, preservedInfluence * 0.5f);
-            preservedHorizontalVelocity = Vector3.Lerp(preservedHorizontalVelocity, Vector3.zero, Time.deltaTime * 2f);
-        }
-        else
-        {
-            moveDirection = (forward * curSpeedX) + (right * curSpeedY);
-        }
+        moveDirection = (forward * curSpeedX) + (right * curSpeedY);
 
         // FOV Update
         UpdateFOV();
@@ -187,9 +171,6 @@ public class SC_FPSController : MonoBehaviour
             moveDirection.y -= currentGravity * Time.deltaTime;
         }
 
-        // Velocity vor dem Move speichern
-        lastVelocity = characterController.velocity;
-
         // Controller bewegen
         characterController.Move(moveDirection * Time.deltaTime);
 
@@ -205,18 +186,6 @@ public class SC_FPSController : MonoBehaviour
 
     void OnPlayerLanded()
     {
-        if (preserveHorizontalMomentumOnLanding)
-        {
-            Vector3 lastHorizontalVel = new Vector3(lastVelocity.x, 0, lastVelocity.z);
-            float impactSpeed = lastHorizontalVel.magnitude;
-
-            if (impactSpeed > walkingSpeed * 1.5f)
-            {
-                preservedHorizontalVelocity = lastHorizontalVel * landingMomentumRetention;
-                Debug.Log($"Landing! Preserved: {preservedHorizontalVelocity.magnitude:F1} m/s (from {impactSpeed:F1})");
-            }
-        }
-
         moveDirection.y = Mathf.Max(moveDirection.y, -2f);
     }
 
@@ -332,13 +301,6 @@ public class SC_FPSController : MonoBehaviour
             Vector3 velocity = characterController.velocity;
             float totalSpeed = velocity.magnitude;
             GUI.Label(new Rect(10, 90, 400, 20), $"Total Velocity: {totalSpeed:F1} m/s (Y: {velocity.y:F1})");
-
-            if (preservedHorizontalVelocity.magnitude > 0.1f)
-            {
-                GUI.color = Color.yellow;
-                GUI.Label(new Rect(10, 110, 400, 20), $"Preserved Momentum: {preservedHorizontalVelocity.magnitude:F1} m/s");
-                GUI.color = Color.white;
-            }
         }
     }
 
@@ -355,11 +317,24 @@ public class SC_FPSController : MonoBehaviour
     public void SetTargetWalkingSpeed(float speed)
     {
         targetWalkingSpeed = speed;
+
+        // Boost (Speed steigt) sofort uebernehmen, damit er nicht durch das
+        // Lerp in Update() verzoegert/verschluckt wird. Decay (Speed faellt)
+        // bleibt ueber das Lerp sanft.
+        if (speed > currentSmoothWalkSpeed)
+        {
+            currentSmoothWalkSpeed = speed;
+        }
     }
 
     public void SetTargetRunningSpeed(float speed)
     {
         targetRunningSpeed = speed;
+
+        if (speed > currentSmoothRunSpeed)
+        {
+            currentSmoothRunSpeed = speed;
+        }
     }
 
     public bool IsWallGrabbing() => isWallGrabbing;
