@@ -48,6 +48,10 @@ public class GoalTrigger : MonoBehaviour
     public bool showGizmo = true;
     public Color gizmoColor = Color.yellow;
 
+    [Header("Timer Integration")]
+    [Tooltip("TimerController, der beim Goal-Erreichen pausiert/gestoppt wird (auto-detected wenn leer)")]
+    public TimerController timerController;
+
     private bool hasBeenTriggered = false;
     private SceneDirector sceneDirector;
     private Vector3 originalScale;
@@ -71,6 +75,17 @@ public class GoalTrigger : MonoBehaviour
         if (sceneDirector == null)
         {
             Debug.LogError("❌ GoalTrigger: Kein SceneDirector in der Scene gefunden!");
+        }
+
+        // Finde TimerController in der Scene (optional)
+        if (timerController == null)
+        {
+            timerController = FindObjectOfType<TimerController>();
+        }
+
+        if (timerController == null && showDebugInfo)
+        {
+            Debug.LogWarning("⚠️ GoalTrigger: Kein TimerController in der Scene gefunden. Timer wird nicht gestoppt.");
         }
 
         // Setup
@@ -235,6 +250,13 @@ public class GoalTrigger : MonoBehaviour
         hasBeenTriggered = true;
 
         Debug.Log($"🎉 GOAL ERREICHT: {gameObject.name}");
+
+        // Timer stoppen und Medal auswerten (vor Slow-Motion, damit die Zeit nicht durch
+        // die Time.timeScale-Änderung verzerrt wird)
+        if (timerController != null)
+        {
+            timerController.StopAndEvaluate();
+        }
 
         // Effekte abspielen
         PlayEffects();

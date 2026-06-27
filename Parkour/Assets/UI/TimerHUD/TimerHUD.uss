@@ -1,0 +1,253 @@
+/* ============================================================
+   TimerHUD.uss
+   Styling für das Speedrun-Timer HUD (UI Toolkit).
+   Dunkles, leicht transparentes Panel mit Glow-Akzenten für
+   die Medal-Farben. Keine externen Texturen nötig.
+   ============================================================ */
+
+:root {
+    --color-bg-panel: rgba(18, 20, 26, 0.78);
+    --color-bg-row: rgba(255, 255, 255, 0.04);
+    --color-bg-row-active: rgba(255, 255, 255, 0.09);
+    --color-text-main: rgb(240, 240, 245);
+    --color-text-dim: rgba(240, 240, 245, 0.45);
+
+    --color-gold: rgb(255, 209, 71);
+    --color-gold-dark: rgb(168, 126, 22);
+    --color-silver: rgb(214, 220, 226);
+    --color-silver-dark: rgb(140, 148, 156);
+    --color-bronze: rgb(214, 144, 80);
+    --color-bronze-dark: rgb(140, 88, 42);
+}
+
+.root-anchor {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    width: 280px;
+}
+
+/* ---------- Haupt-Panel ---------- */
+
+.hud-panel {
+    background-color: var(--color-bg-panel);
+    border-radius: 14px;
+    padding: 16px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- Live-Zeit ---------- */
+
+.time-display-container {
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.time-label-small {
+    font-size: 11px;
+    color: var(--color-text-dim);
+    -unity-font-style: bold;
+    letter-spacing: 2px;
+    margin-bottom: 2px;
+}
+
+.time-value {
+    font-size: 42px;
+    color: var(--color-text-main);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.divider {
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.08);
+    margin-bottom: 12px;
+    margin-top: 4px;
+}
+
+/* ---------- Medal-Zeilen ---------- */
+
+.medal-row {
+    flex-direction: row;
+    align-items: center;
+    background-color: var(--color-bg-row);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    transition-property: background-color, scale;
+    transition-duration: 0.15s;
+}
+
+.medal-row:last-child {
+    margin-bottom: 0;
+}
+
+.medal-row--active {
+    background-color: var(--color-bg-row-active);
+    scale: 1.02 1.02;
+}
+
+.medal-row--missed {
+    opacity: 0.4;
+}
+
+/* ---------- Medaillen-Icon (rein über USS, kein Sprite) ---------- */
+
+.medal-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border-width: 2px;
+    margin-right: 10px;
+    -unity-background-scale-mode: scale-to-fit;
+    align-items: center;
+    justify-content: center;
+}
+
+.medal-icon-inner {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+.medal-icon--gold {
+    background-color: var(--color-gold);
+    border-color: var(--color-gold-dark);
+}
+
+.medal-icon--silver {
+    background-color: var(--color-silver);
+    border-color: var(--color-silver-dark);
+}
+
+.medal-icon--bronze {
+    background-color: var(--color-bronze);
+    border-color: var(--color-bronze-dark);
+}
+
+.medal-icon--inactive {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Glow-Effekt wenn Medal aktiv erreichbar/erreicht ist */
+.medal-icon--glow-gold {
+    border-width: 2px;
+    border-color: var(--color-gold);
+}
+
+.medal-icon--glow-silver {
+    border-width: 2px;
+    border-color: var(--color-silver);
+}
+
+.medal-icon--glow-bronze {
+    border-width: 2px;
+    border-color: var(--color-bronze);
+}
+
+/* ---------- Medal-Text-Block ---------- */
+
+.medal-text-block {
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.medal-name {
+    font-size: 13px;
+    -unity-font-style: bold;
+    color: var(--color-text-main);
+}
+
+.medal-target-time {
+    font-size: 12px;
+    color: var(--color-text-dim);
+}
+
+.medal-name--gold { color: var(--color-gold); }
+.medal-name--silver { color: var(--color-silver); }
+.medal-name--bronze { color: var(--color-bronze); }
+
+/* ---------- Checkmark ---------- */
+
+.medal-check {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.08);
+    align-items: center;
+    justify-content: center;
+    -unity-font-style: bold;
+}
+
+.medal-check-label {
+    font-size: 14px;
+    color: var(--color-text-dim);
+    -unity-text-align: middle-center;
+}
+
+.medal-check--done {
+    background-color: rgba(80, 220, 130, 0.9);
+}
+
+.medal-check--done .medal-check-label {
+    color: rgb(18, 20, 26);
+}
+
+/* ---------- Result-Panel (Vollbild-Overlay bei Zielankunft) ---------- */
+
+.result-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(8, 9, 12, 0.7);
+    align-items: center;
+    justify-content: center;
+    display: none;
+}
+
+.result-overlay--visible {
+    display: flex;
+}
+
+.result-card {
+    background-color: rgb(24, 26, 33);
+    border-radius: 20px;
+    padding: 32px 48px;
+    align-items: center;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.result-title {
+    font-size: 16px;
+    letter-spacing: 3px;
+    color: var(--color-text-dim);
+    -unity-font-style: bold;
+    margin-bottom: 8px;
+}
+
+.result-medal-icon {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    border-width: 4px;
+    margin-bottom: 16px;
+}
+
+.result-time {
+    font-size: 48px;
+    -unity-font-style: bold;
+    color: var(--color-text-main);
+    margin-bottom: 4px;
+}
+
+.result-medal-name {
+    font-size: 22px;
+    -unity-font-style: bold;
+    letter-spacing: 1px;
+}
