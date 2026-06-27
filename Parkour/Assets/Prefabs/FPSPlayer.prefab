@@ -256,7 +256,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1036552637450684959}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 35fb9220adfe5844a8c35faf08923bf0, type: 3}
   m_Name: 
@@ -277,7 +277,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1036552637450684959}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 34769afd056883c46bd2b390b611a10b, type: 3}
   m_Name: 
@@ -293,7 +293,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1036552637450684959}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a09440bc71c74bb4689d972c22e4816e, type: 3}
   m_Name: 
@@ -312,7 +312,7 @@ MonoBehaviour:
   enableAirStrafe: 1
   airStrafeAcceleration: 1.5
   airStrafeMaxSpeed: 5
-  enableSurfing: 1
+  enableSurfing: 0
   speedDecayRate: 5
   speedFloorPercentage: 0.3
   decayCurve:
@@ -348,7 +348,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1036552637450684959}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7221d745ac9b5e142aaf7f3cd9b8bdd4, type: 3}
   m_Name: 
@@ -370,11 +370,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 19303dbd9ede37b4c88873724de8d7b3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  comboBoostPerJump: 0.25
+  comboBoostPerJump: 0
   maxComboMultiplier: 3
-  comboWindow: 1
+  comboWindow: 1.2
   boostHoldDuration: 1
-  decayRate: 2
+  decayRate: 0.5
 --- !u!1 &2876241451336742777
 GameObject:
   m_ObjectHideFlags: 0

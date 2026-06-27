@@ -162,9 +162,14 @@ public class SC_FPSController : MonoBehaviour
         UpdateFOV();
 
         // Jump Logik
-        if (Input.GetButton("Jump") && canMove && !isGrappling && characterController.isGrounded)
+        if (Input.GetButtonDown("Jump") && canMove && !isGrappling && characterController.isGrounded)
         {
             moveDirection.y = jumpSpeed;
+
+            if (velocityMultiplier != null)
+            {
+                velocityMultiplier.OnJumpAction();
+            }
         }
         else if (Input.GetButtonDown("Jump") && canMove && !isGrappling && isWallGrabbing)
         {
@@ -303,7 +308,7 @@ public class SC_FPSController : MonoBehaviour
 
         if (velocityMultiplier != null)
         {
-            velocityMultiplier.OnWallJump();
+            velocityMultiplier.OnJumpAction();
         }
 
         EndWallGrab();
