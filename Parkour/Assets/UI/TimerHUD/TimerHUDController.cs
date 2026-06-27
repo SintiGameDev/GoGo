@@ -40,6 +40,7 @@ public class TimerHUDController : MonoBehaviour
     private VisualElement resultMedalIcon;
     private Label resultTimeLabel;
     private Label resultMedalNameLabel;
+    private Label resultBestTimeLabel;
 
     // Cache, um das Zeit-Label nur zu aktualisieren wenn sich der angezeigte
     // Text tatsächlich ändert (vermeidet unnötige Re-Layout-Passes pro Frame)
@@ -75,6 +76,7 @@ public class TimerHUDController : MonoBehaviour
         resultMedalIcon = root.Q<VisualElement>("result-medal-icon");
         resultTimeLabel = root.Q<Label>("result-time-label");
         resultMedalNameLabel = root.Q<Label>("result-medal-name-label");
+        resultBestTimeLabel = root.Q<Label>("result-best-time-label");
 
         if (showDebugInfo)
         {
@@ -272,6 +274,27 @@ public class TimerHUDController : MonoBehaviour
         {
             SetRankClass(resultMedalIcon, "medal-icon", rank);
         }
+
+        UpdateBestTimeDisplay();
+    }
+
+    /// <summary>
+    /// Zeigt die persistente Bestzeit für diese Szene an. Wenn der gerade
+    /// abgeschlossene Lauf eine neue Bestzeit ist, wird das farblich hervorgehoben.
+    /// </summary>
+    void UpdateBestTimeDisplay()
+    {
+        if (resultBestTimeLabel == null || timerController == null)
+            return;
+
+        float bestTime = timerController.GetBestTime();
+        bool isNewBest = timerController.IsNewBestTime();
+
+        resultBestTimeLabel.text = timerController.HasBestTime()
+            ? TimerController.FormatTime(bestTime)
+            : "—";
+
+        resultBestTimeLabel.EnableInClassList("result-best-time--new", isNewBest);
     }
 
     // ---------------- Reset ----------------
@@ -288,6 +311,9 @@ public class TimerHUDController : MonoBehaviour
 
         if (targetCheck != null)
             targetCheck.RemoveFromClassList("medal-check--done");
+
+        if (resultBestTimeLabel != null)
+            resultBestTimeLabel.RemoveFromClassList("result-best-time--new");
 
         if (resultOverlay != null)
             resultOverlay.RemoveFromClassList("result-overlay--visible");

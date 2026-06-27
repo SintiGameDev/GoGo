@@ -271,3 +271,71 @@
     -unity-font-style: bold;
     letter-spacing: 1px;
 }
+
+/* ---------- Bestzeit-Zeile im Result-Card ---------- */
+
+.result-divider {
+    width: 100%;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.1);
+    margin-top: 18px;
+    margin-bottom: 14px;
+}
+
+.result-best-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 18px;
+}
+
+.result-best-label {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--color-text-dim);
+    -unity-font-style: bold;
+}
+
+.result-best-time {
+    font-size: 18px;
+    -unity-font-style: bold;
+    color: var(--color-text-main);
+}
+
+/* Bestzeit hervorheben, wenn der aktuelle Lauf eine neue Bestzeit ist */
+.result-best-time--new {
+    color: var(--color-gold);
+}
+
+/* ---------- Input-Hinweise (R / Enter) ---------- */
+
+.result-hints-row {
+    flex-direction: row;
+    justify-content: center;
+}
+
+.result-hint {
+    flex-direction: row;
+    align-items: center;
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+.result-hint-key {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.2);
+    padding: 3px 9px;
+    margin-right: 8px;
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: var(--color-text-main);
+}
+
+.result-hint-text {
+    font-size: 12px;
+    color: var(--color-text-dim);
+}
+
