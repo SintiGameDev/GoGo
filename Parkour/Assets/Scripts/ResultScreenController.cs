@@ -4,8 +4,8 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// Wartet, bis der TimerController das Level final gestoppt hat (Goal erreicht),
 /// und ermöglicht dem Spieler dann per Tastendruck:
-///   R          -> aktuelle Szene neu starten
-///   Leertaste  -> nächstes Level laden (über SceneDirector)
+///   R     -> aktuelle Szene neu starten
+///   Enter -> nächstes Level laden (über SceneDirector)
 ///
 /// Getrennt von GoalTrigger gehalten, da GoalTrigger für Kollisionserkennung
 /// zuständig ist und dieses Script für die Post-Result-Eingabe.
@@ -21,7 +21,7 @@ public class ResultScreenController : MonoBehaviour
 
     [Header("Input")]
     public KeyCode restartKey = KeyCode.R;
-    public KeyCode nextLevelKey = KeyCode.Space;
+    public KeyCode nextLevelKey = KeyCode.Return;
 
     [Tooltip("Zusätzliche Verzögerung nach Zielankunft, bevor Input akzeptiert wird (verhindert versehentliches Sofort-Restarten durch denselben Tastendruck, der z.B. eine andere Aktion ausgelöst hat)")]
     public float inputDelayAfterFinish = 0.3f;
@@ -67,7 +67,7 @@ public class ResultScreenController : MonoBehaviour
         finishedAt = Time.unscaledTime;
 
         if (showDebugInfo)
-            Debug.Log("🎮 ResultScreenController: Wartet jetzt auf Input (R = Neustart, Leertaste = Nächstes Level)");
+            Debug.Log("🎮 ResultScreenController: Wartet jetzt auf Input (R = Neustart, Enter = Nächstes Level)");
     }
 
     void Update()

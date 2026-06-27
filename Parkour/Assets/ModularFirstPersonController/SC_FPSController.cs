@@ -21,38 +21,6 @@ public class SC_FPSController : MonoBehaviour
     public LayerMask wallLayer;
     public GameObject colliderObject;
 
-    [Header("Auto Wall Jump")]
-    [Tooltip("Wenn aktiv: Spieler prallt bei Wandkontakt sofort automatisch ab (kein Wall-Grab/Hängen mehr). Wenn deaktiviert: altes Wall-Grab-Verhalten mit Timer + manuellem Jump-Input bleibt erhalten.")]
-    public bool useAutoWallJump = true;
-
-    [Tooltip("Zusätzlicher Speed-Bonus (Gesamt-3D-Geschwindigkeit), der ADDITIV auf den ursprünglichen Einfalls-Speed des Spielers aufgeschlagen wird (z.B. war man mit 12 m/s da, kommt man mit 12+X m/s aus dem Walljump raus). Die RICHTUNG ist eine echte 3D-Reflexion (Einfallswinkel = Ausfallswinkel) an der Wandnormale.")]
-    public float autoWallJumpExtraSpeed = 4.0f;
-
-    [Tooltip("Minimale horizontale Einfallsgeschwindigkeit, damit überhaupt reflektiert wird. Darunter (z.B. Spieler steht fast bewegungslos an der Wand) wird die Wandnormale direkt als Richtung genutzt, da eine Reflexion von ~0 keine sinnvolle Richtung ergibt.")]
-    public float minIncomingSpeedForReflection = 0.5f;
-
-    [Header("Auto Wall Jump - Steilerer Ausfallswinkel")]
-    [Tooltip("Mindest-Steigungswinkel (in Grad, 0-90) der vor der Reflexion künstlich in die Einfallsrichtung eingemischt wird. Sorgt dafür, dass der Spieler steiler nach oben abprallt statt nur flach reflektiert zu werden, auch bei flachem Anlaufwinkel. 0 = reine, ungeänderte Reflexion.")]
-    [Range(0f, 89f)]
-    public float minLaunchAngle = 35f;
-
-    [Header("Auto Wall Jump - Extra Höhenboost")]
-    [Tooltip("Zusätzlicher Aufwärts-Boost (separat von der Reflexion), der nochmal oben auf die finale Y-Komponente jedes automatischen Walljumps aufgeschlagen wird")]
-    public float wallJumpHeightBoost = 7.0f;
-
-    [Tooltip("Mindestabstand zwischen zwei automatischen Walljumps (verhindert Mehrfachauslösung durch mehrere Collider-Hits im selben Frame/derselben Kontaktserie)")]
-    public float autoWallJumpCooldown = 0.2f;
-
-    [Tooltip("Wie lange der Abprall-Impuls über die normale Bewegungseingabe hinweg erhalten bleibt, bevor der Spieler wieder volle Kontrolle über die Bewegungsrichtung hat. Kurz halten für maximalen Flow/schnelle Kontrollübergabe.")]
-    public float autoWallJumpMomentumDuration = 0.15f;
-
-    [Header("Auto Wall Jump - Kamera-Rotation")]
-    [Tooltip("Kamera/Blickrichtung beim Walljump automatisch zur neuen Sprungrichtung drehen")]
-    public bool autoRotateCameraOnWallJump = true;
-
-    [Tooltip("Dauer der automatischen Dreh-Animation zur neuen Sprungrichtung. Kurz halten, damit der Spieler schnell wieder selbst die Kamera übernehmen kann.")]
-    public float autoWallJumpCameraTurnDuration = 0.1f;
-
     // FOV-EINSTELLUNGEN
     public float baseFOV = 60f;
     public float maxFOV = 90f;
@@ -79,22 +47,6 @@ public class SC_FPSController : MonoBehaviour
     private WallGrabTrigger wallGrabTrigger;
     private VelocityMultiplier velocityMultiplier;
     private HeadBang headBang;
-
-    private float lastAutoWallJumpTime = -999f;
-
-    // Horizontaler Boost-Vektor des Auto-Walljumps, der über autoWallJumpMomentumDuration
-    // ausklingt und additiv zur normalen Input-Bewegung gelegt wird (siehe Update()).
-    private Vector3 autoWallJumpBoostVector = Vector3.zero;
-    private float autoWallJumpBoostTimer = 0f;
-
-    // Kamera-Auto-Rotation zur neuen Sprungrichtung nach einem Auto-Walljump.
-    // Läuft parallel zur normalen Maussteuerung in Update() und blendet sich
-    // über autoWallJumpCameraTurnDuration sanft ein bzw. wird von ihr überschrieben,
-    // sobald sie abgelaufen ist - der Spieler übernimmt danach nahtlos wieder per Maus.
-    private bool isAutoRotatingCamera = false;
-    private float autoRotateYawStart = 0f;
-    private float autoRotateYawTarget = 0f;
-    private float autoRotateTimer = 0f;
 
     private LTDescr fovTween;
     private float lastTargetFOV = 0f;
@@ -192,25 +144,6 @@ public class SC_FPSController : MonoBehaviour
 
         moveDirection = (forward * curSpeedX) + (right * curSpeedY);
 
-        // Auto-Walljump-Boost: läuft additiv über die normale Input-Bewegung,
-        // solange er noch nicht ausgeklungen ist. Klingt linear über
-        // autoWallJumpMomentumDuration ab, statt abrupt zu verschwinden.
-        if (autoWallJumpBoostTimer > 0f)
-        {
-            float fadeRatio = autoWallJumpMomentumDuration > 0f
-                ? Mathf.Clamp01(autoWallJumpBoostTimer / autoWallJumpMomentumDuration)
-                : 0f;
-
-            moveDirection += autoWallJumpBoostVector * fadeRatio;
-
-            autoWallJumpBoostTimer -= Time.deltaTime;
-            if (autoWallJumpBoostTimer <= 0f)
-            {
-                autoWallJumpBoostTimer = 0f;
-                autoWallJumpBoostVector = Vector3.zero;
-            }
-        }
-
         // FOV Update
         UpdateFOV();
 
@@ -255,54 +188,7 @@ public class SC_FPSController : MonoBehaviour
             rotationX += -Input.GetAxis("Mouse Y") * lookSpeed;
             rotationX = Mathf.Clamp(rotationX, -lookXLimit, lookXLimit);
             playerCamera.transform.localRotation = Quaternion.Euler(rotationX, 0, 0);
-
-            if (isAutoRotatingCamera)
-            {
-                // Während der kurzen Walljump-Dreh-Animation übernimmt
-                // UpdateCameraAutoRotation() den Yaw-Anteil (inkl. Mausdelta),
-                // um die normale additive Zeile unten nicht doppelt anzuwenden.
-                UpdateCameraAutoRotation();
-            }
-            else
-            {
-                transform.rotation *= Quaternion.Euler(0, Input.GetAxis("Mouse X") * lookSpeed, 0);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Wertet die kurze Dreh-Animation zur Walljump-Sprungrichtung aus (siehe
-    /// StartCameraAutoRotation). Interpoliert den Yaw-Anteil sanft zum Zielwinkel,
-    /// ohne die Pitch-Rotation (rotationX) der Kamera zu beeinflussen.
-    /// </summary>
-    void UpdateCameraAutoRotation()
-    {
-        if (!isAutoRotatingCamera)
-            return;
-
-        // Mauseingabe während der Animation soll den Spieler tatsächlich mitsteuern
-        // lassen statt überschrieben zu werden: das Maus-Yaw-Delta dieses Frames
-        // (bereits oben auf transform.rotation angewendet) wird hier zusätzlich auf
-        // Start- und Zielwinkel übertragen, sodass beide "mitwandern" und die
-        // Interpolation relativ zur Mausbewegung konsistent bleibt.
-        float mouseYawDelta = Input.GetAxis("Mouse X") * lookSpeed;
-        autoRotateYawStart += mouseYawDelta;
-        autoRotateYawTarget += mouseYawDelta;
-
-        autoRotateTimer -= Time.deltaTime;
-
-        float progress = autoWallJumpCameraTurnDuration > 0f
-            ? 1f - Mathf.Clamp01(autoRotateTimer / autoWallJumpCameraTurnDuration)
-            : 1f;
-
-        float currentYaw = Mathf.LerpAngle(autoRotateYawStart, autoRotateYawTarget, progress);
-
-        Vector3 currentEuler = transform.eulerAngles;
-        transform.rotation = Quaternion.Euler(currentEuler.x, currentYaw, currentEuler.z);
-
-        if (autoRotateTimer <= 0f)
-        {
-            isAutoRotatingCamera = false;
+            transform.rotation *= Quaternion.Euler(0, Input.GetAxis("Mouse X") * lookSpeed, 0);
         }
     }
 
@@ -352,23 +238,6 @@ public class SC_FPSController : MonoBehaviour
 
     public void StartWallGrab(Vector3 normal)
     {
-        if (useAutoWallJump)
-        {
-            // Neues Verhalten: sofortiger automatischer Abprall statt Hängen.
-            // Cooldown verhindert, dass mehrere Collider-Hits derselben
-            // Kontaktserie (z.B. Trigger + Collision im selben Frame) mehrfach
-            // hintereinander einen Walljump auslösen.
-            if (Time.time - lastAutoWallJumpTime < autoWallJumpCooldown)
-                return;
-
-            if (characterController.isGrounded)
-                return;
-
-            PerformAutoWallJump(normal);
-            return;
-        }
-
-        // Altes Verhalten: Wall-Grab/Hängen mit Timer + manuellem Jump-Input
         if (!isWallGrabbing && !characterController.isGrounded)
         {
             isWallGrabbing = true;
@@ -421,123 +290,6 @@ public class SC_FPSController : MonoBehaviour
 
         EndWallGrab();
         Debug.Log("Wall Jump!");
-    }
-
-    /// <summary>
-    /// Automatischer Abprall bei Wandkontakt (ersetzt das Wall-Grab/Hängen, solange
-    /// useAutoWallJump aktiv ist). Die Richtung ist eine echte Reflexion der
-    /// einfallenden horizontalen Bewegungsrichtung an der Wandnormale
-    /// (Einfallswinkel = Ausfallswinkel, wie ein Ball): r = d - 2(d·n)n.
-    /// Bei frontalem Aufprall (d zeigt direkt auf die Wand) ergibt das einen
-    /// geraden Rückprall in die umgekehrte Anlaufrichtung. Bei seitlichem/
-    /// streifendem Anlauf (d fast parallel zur Wand) wird die Bewegung fast
-    /// unverändert fortgesetzt - genau das ermöglicht das seitliche Vorbeispringen.
-    /// Zusätzlich gibt es bei JEDEM Auto-Walljump einen festen Extra-Höhenboost
-    /// (wallJumpHeightBoost), unabhängig vom Aufprallwinkel.
-    /// </summary>
-    void PerformAutoWallJump(Vector3 normal)
-    {
-        Vector3 flatNormal = normal;
-        flatNormal.y = 0f;
-        flatNormal.Normalize();
-
-        // Einfallende horizontale Bewegungsrichtung (vor dem Aufprall)
-        Vector3 incomingHorizontal = new Vector3(moveDirection.x, 0f, moveDirection.z);
-        float incomingSpeed = incomingHorizontal.magnitude;
-
-        Vector3 incomingHorizontalDir;
-        if (incomingSpeed >= minIncomingSpeedForReflection)
-        {
-            incomingHorizontalDir = incomingHorizontal / incomingSpeed;
-        }
-        else
-        {
-            // Spieler hatte kaum horizontale Geschwindigkeit (z.B. fast senkrecht
-            // gegen die Wand gelaufen und sofort gestoppt) - eine Reflexion von
-            // einem Nahezu-Null-Vektor ergibt keine sinnvolle Richtung, daher
-            // stattdessen direkt von der Wand weg springen.
-            incomingHorizontalDir = flatNormal;
-        }
-
-        // Mindest-Steigungswinkel künstlich in die Einfallsrichtung einmischen,
-        // BEVOR reflektiert wird: die horizontale Richtung bleibt erhalten (kippt
-        // nach oben), die Wandnormale selbst bleibt rein horizontal (vertikale
-        // Wand). Da die Normale keine Y-Komponente hat, bleibt die nach oben
-        // geneigte Y-Komponente der Einfallsrichtung bei der Reflexion erhalten -
-        // das Ergebnis fliegt dadurch garantiert steiler nach oben heraus, auch
-        // bei flachem/horizontalem Anlaufwinkel.
-        float launchAngleRad = minLaunchAngle * Mathf.Deg2Rad;
-        Vector3 tiltedIncoming = (incomingHorizontalDir * Mathf.Cos(launchAngleRad)) +
-                                  (Vector3.up * Mathf.Sin(launchAngleRad));
-        tiltedIncoming.Normalize();
-
-        // Reflexion in 3D: r = d - 2(d·n)n (n bleibt horizontal, da vertikale Wand)
-        float dot = Vector3.Dot(tiltedIncoming, flatNormal);
-        Vector3 reflected = tiltedIncoming - 2f * dot * flatNormal;
-        reflected.Normalize();
-
-        // Gesamt-Speed = ursprünglicher Einfalls-Speed + fester Extra-Bonus
-        // (additiv) - schnellerer Anlauf ergibt dadurch auch einen schnelleren,
-        // weiteren Abprall, statt einem vom Speed unabhängigen Fixwert.
-        float outgoingSpeed = incomingSpeed + autoWallJumpExtraSpeed;
-        Vector3 launchVelocity = reflected * outgoingSpeed;
-
-        // Zusätzlicher Höhenboost (separat von der Reflexion) oben auf die Y-Komponente
-        launchVelocity.y += wallJumpHeightBoost;
-
-        // Y-Komponente sofort setzen (läuft danach ganz normal über die bestehende
-        // Schwerkraft-Logik in Update() aus, wie bei jedem anderen Sprung auch).
-        moveDirection.y = launchVelocity.y;
-
-        // Horizontale Komponente läuft über den ausklingenden Boost-Vektor, da
-        // moveDirection.x/.z in Update() jeden Frame neu aus der Bewegungseingabe
-        // berechnet wird und einen einmaligen Direktwert sofort überschreiben würde.
-        autoWallJumpBoostVector = new Vector3(launchVelocity.x, 0f, launchVelocity.z);
-        autoWallJumpBoostTimer = autoWallJumpMomentumDuration;
-
-        lastAutoWallJumpTime = Time.time;
-
-        if (autoRotateCameraOnWallJump)
-        {
-            StartCameraAutoRotation(reflected);
-        }
-
-        if (velocityMultiplier != null)
-        {
-            velocityMultiplier.OnJumpAction();
-        }
-
-        if (headBang != null)
-        {
-            headBang.OnWallGrabImpact();
-        }
-
-        Debug.Log($"🧱 Auto Wall Jump! Reflektierte Richtung: {reflected} | Einfalls-Speed: {incomingSpeed:F1} → Abprall-Speed: {outgoingSpeed:F1} | Höhenboost: +{wallJumpHeightBoost:F1} | Gesamt-Y: {moveDirection.y:F1}");
-    }
-
-    /// <summary>
-    /// Startet eine kurze, smoothe Dreh-Animation der Blickrichtung zur neuen
-    /// Sprungrichtung. Läuft parallel zur normalen Mausrotation in Update() und
-    /// übergibt nach Ablauf nahtlos zurück an die Spielersteuerung.
-    /// </summary>
-    void StartCameraAutoRotation(Vector3 launchDirection)
-    {
-        // Nur die horizontale (X/Z) Komponente bestimmt den Yaw - eine eventuelle
-        // Y-Komponente (z.B. durch den künstlichen Steigungswinkel) wird hier
-        // automatisch ignoriert, da Atan2 nur X/Z auswertet.
-        if (new Vector2(launchDirection.x, launchDirection.z).sqrMagnitude < 0.0001f)
-            return;
-
-        autoRotateYawStart = transform.eulerAngles.y;
-        autoRotateYawTarget = Mathf.Atan2(launchDirection.x, launchDirection.z) * Mathf.Rad2Deg;
-        autoRotateTimer = autoWallJumpCameraTurnDuration;
-        isAutoRotatingCamera = autoWallJumpCameraTurnDuration > 0f;
-
-        if (!isAutoRotatingCamera)
-        {
-            // Dauer 0 -> sofortiger Snap statt Animation
-            transform.rotation = Quaternion.Euler(0f, autoRotateYawTarget, 0f);
-        }
     }
 
     void OnGUI()
