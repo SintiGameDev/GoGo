@@ -246,6 +246,7 @@ MonoBehaviour:
   fovChangeDuration: 0.2
   fovSpeedThreshold: 15
   speedTransitionRate: 30
+  maxTotalVelocity: 65
   canMove: 1
 --- !u!114 &3999707696816788914
 MonoBehaviour:
@@ -370,9 +371,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   fastestJumpInterval: 0.3
   slowestJumpInterval: 1.5
-  maxBoostPerJump: 1.1
+  maxBoostPerJump: 0.5
   minBoostPerJump: 0.2
-  maxComboMultiplier: 6
+  maxComboMultiplier: 3
   boostHoldDuration: 1
   decayRate: 0.5
 --- !u!1 &2876241451336742777

@@ -29,6 +29,8 @@ public class SC_FPSController : MonoBehaviour
 
     [Header("Speed Settings")]
     public float speedTransitionRate = 10f;
+    [Tooltip("Maximale Gesamtgeschwindigkeit (x/y/z kombiniert), auf die moveDirection vor jedem Move gecapt wird")]
+    public float maxTotalVelocity = 30f;
 
     CharacterController characterController;
     Rigidbody rb;
@@ -169,6 +171,12 @@ public class SC_FPSController : MonoBehaviour
         {
             float currentGravity = isWallGrabbing ? gravity * 0.3f : gravity;
             moveDirection.y -= currentGravity * Time.deltaTime;
+        }
+
+        // Maximale Total Velocity cappen (x/y/z kombiniert), unabhaengig von der Quelle
+        if (moveDirection.magnitude > maxTotalVelocity)
+        {
+            moveDirection = moveDirection.normalized * maxTotalVelocity;
         }
 
         // Controller bewegen
