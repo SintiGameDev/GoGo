@@ -202,7 +202,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   highlightColor: {r: 0.015686274, g: 1, b: 0.94338894, a: 1}
-  highlightIntensity: 2
+  highlightIntensity: 0.4
   useEmission: 1
   minColliderRadius: 1
   maxColliderRadius: 15
@@ -213,6 +213,8 @@ MonoBehaviour:
   disablePlayerCollisionWithGrabbables: 0
   colliderUpdateSmoothness: 5
   safetyMargin: 0.2
+  impactSurfaceBuffer: 0.6
+  fallbackImpactDistance: 2
   destroyEffect: {fileID: 0}
   grappleSound: {fileID: 0}
   destroySound: {fileID: 8300000, guid: 17727032be7e3c149b5d4c8ece783f79, type: 3}

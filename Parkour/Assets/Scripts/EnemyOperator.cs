@@ -39,6 +39,12 @@ public class EnemyOperator : MonoBehaviour
     public float colliderUpdateSmoothness = 5f; // Wie smooth Collider-Changes sind
     public float safetyMargin = 0.2f; // Extra Abstand für Safety
 
+    [Header("Hit Tracer (Impact Point)")]
+    [Tooltip("Zusätzlicher Puffer vor der echten Mesh-Oberfläche, an dem der Enemy zerstört wird")]
+    public float impactSurfaceBuffer = 0.4f;
+    [Tooltip("Fallback-Distanz, falls kein Renderer/Bounds gefunden werden kann")]
+    public float fallbackImpactDistance = 2f;
+
     [Header("Effects")]
     public GameObject destroyEffect;
     public AudioClip grappleSound;
@@ -417,15 +423,18 @@ public class EnemyOperator : MonoBehaviour
         float distance = toTarget.magnitude;
         Vector3 direction = distance > 0.0001f ? toTarget / distance : Vector3.zero;
 
+        // Hit Tracer: berechnet jeden Frame den exakten Abstand zur Mesh-Oberfläche
+        // entlang der Bewegungsrichtung (Ray-vs-Bounds, kein Physics-Raycast nötig)
+        float impactDistance = CalculateImpactDistance(targetEnemy, transform.position);
+
         if (characterController != null)
         {
-            // Geplante Bewegung für diesen Frame
             float step = grappleSpeed * Time.deltaTime;
 
-            // Wie weit dürfen wir uns dem Enemy noch nähern, bevor wir killRadius erreichen?
-            float maxAllowedStep = Mathf.Max(0f, distance - killRadius);
+            // Wie weit dürfen wir uns noch nähern, bevor wir die Mesh-Oberfläche erreichen?
+            float maxAllowedStep = Mathf.Max(0f, distance - impactDistance);
 
-            // Bewegung clampen -> Spieler bleibt immer auf/außerhalb killRadius, kein Eindringen ins Mesh
+            // Bewegung clampen -> Spieler bleibt immer vor der echten Mesh-Oberfläche
             float clampedStep = Mathf.Min(step, maxAllowedStep);
 
             if (clampedStep > 0f)
@@ -434,10 +443,43 @@ public class EnemyOperator : MonoBehaviour
             }
         }
 
-        if (distance <= killRadius)
+        if (distance <= impactDistance)
         {
             DestroyEnemyWithSlowMotion();
         }
+    }
+
+    // NEUE: Hit Tracer - berechnet den Abstand zur tatsächlichen Mesh-Oberfläche
+    // statt sich auf den künstlichen killRadius zu verlassen. Nutzt Bounds.IntersectRay
+    // (analytischer Ray-vs-AABB-Test), funktioniert unabhängig vom Collider-Zustand.
+    float CalculateImpactDistance(GameObject enemy, Vector3 fromPosition)
+    {
+        Renderer rend = enemy.GetComponent<Renderer>();
+        if (rend == null)
+        {
+            rend = enemy.GetComponentInChildren<Renderer>();
+        }
+
+        if (rend != null)
+        {
+            Bounds bounds = rend.bounds;
+            Vector3 toCenter = bounds.center - fromPosition;
+            float fullDist = toCenter.magnitude;
+
+            if (fullDist > 0.0001f)
+            {
+                Ray tracerRay = new Ray(fromPosition, toCenter.normalized);
+
+                if (bounds.IntersectRay(tracerRay, out float hitDistance))
+                {
+                    // hitDistance = Abstand bis zur Bounds-Oberfläche (0, falls bereits innen)
+                    return Mathf.Max(0f, hitDistance + impactSurfaceBuffer);
+                }
+            }
+        }
+
+        // Fallback, falls kein Renderer gefunden wurde oder der Ray die Bounds verfehlt
+        return Mathf.Max(killRadius, fallbackImpactDistance);
     }
 
     void OnControllerColliderHit(ControllerColliderHit hit)
