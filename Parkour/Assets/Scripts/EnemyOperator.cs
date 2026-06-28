@@ -527,6 +527,13 @@ public class EnemyOperator : MonoBehaviour
             targetEnemy = null;
         }
 
+        // NEUE: Weiß-Flash + FOV-Bounce im exakten Kill-Moment - kaschiert verbleibendes
+        // Mesh-Clipping, da der Bildschirm im Aufprall-Frame kurz aufhellt.
+        if (fpsController != null)
+        {
+            fpsController.TriggerImpactFeedback();
+        }
+
         isGrappling = false;
         StartSlowMotion();
     }

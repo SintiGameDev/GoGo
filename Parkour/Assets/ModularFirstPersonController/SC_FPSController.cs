@@ -70,6 +70,24 @@ public class SC_FPSController : MonoBehaviour
     public float fovChangeDuration = 0.3f;
     public float fovSpeedThreshold = 15f;
 
+    [Header("Impact Feedback (Grapple Kill)")]
+    [Tooltip("UI Image (volle Screen-Größe, weiß, Alpha 0 als Start) für den Impact-Flash. Canvas-Sortierung muss ueber dem Rest liegen.")]
+    public UnityEngine.UI.Image impactFlashImage;
+    [Tooltip("Wie schnell der Flash auf volle Helligkeit hochschnellt")]
+    public float impactFlashInDuration = 0.04f;
+    [Tooltip("Wie lange der Flash zum Ausblenden braucht")]
+    public float impactFlashOutDuration = 0.18f;
+    [Tooltip("Maximale Alpha des Flashs (1 = komplett weiß)")]
+    [Range(0f, 1f)]
+    public float impactFlashMaxAlpha = 0.85f;
+
+    [Tooltip("Wie stark das FOV beim Impact kurz aufgeht, additiv zum aktuellen FOV")]
+    public float impactFovBounceAmount = 12f;
+    [Tooltip("Wie schnell das FOV beim Impact aufgeht")]
+    public float impactFovBounceInDuration = 0.05f;
+    [Tooltip("Wie schnell das FOV nach dem Bounce wieder zurueckfedert")]
+    public float impactFovBounceOutDuration = 0.25f;
+
     [Header("Speed Settings")]
     public float speedTransitionRate = 10f;
     [Tooltip("Maximale Gesamtgeschwindigkeit (x/y/z kombiniert), auf die moveDirection vor jedem Move gecapt wird. " +
@@ -97,6 +115,10 @@ public class SC_FPSController : MonoBehaviour
 
     private LTDescr fovTween;
     private float lastTargetFOV = 0f;
+
+    private LTDescr impactFlashTween;
+    private LTDescr impactFovTween;
+
 
     private float lastGroundedTime = 0f;
     private bool wasGroundedLastFrame = false;
@@ -169,6 +191,13 @@ public class SC_FPSController : MonoBehaviour
         {
             playerCamera.fieldOfView = baseFOV;
             lastTargetFOV = baseFOV;
+        }
+
+        if (impactFlashImage != null)
+        {
+            Color c = impactFlashImage.color;
+            c.a = 0f;
+            impactFlashImage.color = c;
         }
 
         targetWalkingSpeed = walkingSpeed;
@@ -541,6 +570,68 @@ public class SC_FPSController : MonoBehaviour
     public void ForceJump(float jumpForce)
     {
         moveDirection.y = jumpForce;
+    }
+
+    // NEUE: Wird von EnemyOperator im Moment des Enemy-Kills aufgerufen (Grapple-Impact).
+    // Kaschiert verbleibendes Mesh-Clipping ueber kurzen Weiß-Flash + FOV-Bounce.
+    // Beides läuft auf unscaledTime, damit es auch während Slow-Motion (Time.timeScale < 1)
+    // mit normaler Echtzeit-Geschwindigkeit abspielt statt in der Zeitlupe zu hängen.
+    public void TriggerImpactFeedback()
+    {
+        TriggerImpactFlash();
+        TriggerImpactFovBounce();
+    }
+
+    void TriggerImpactFlash()
+    {
+        if (impactFlashImage == null) return;
+
+        if (impactFlashTween != null && LeanTween.isTweening(impactFlashTween.id))
+        {
+            LeanTween.cancel(impactFlashTween.id);
+        }
+
+        Color startColor = impactFlashImage.color;
+        startColor.a = impactFlashMaxAlpha;
+        impactFlashImage.color = startColor;
+
+        impactFlashTween = LeanTween.value(impactFlashImage.gameObject, impactFlashMaxAlpha, 0f, impactFlashOutDuration)
+            .setUseEstimatedTime(true) // unscaledTime -> laeuft auch in Slow-Motion in Echtzeit
+            .setDelay(impactFlashInDuration)
+            .setOnUpdate((float value) =>
+            {
+                Color c = impactFlashImage.color;
+                c.a = value;
+                impactFlashImage.color = c;
+            })
+            .setOnComplete(() => { impactFlashTween = null; });
+    }
+
+    void TriggerImpactFovBounce()
+    {
+        if (playerCamera == null) return;
+
+        if (impactFovTween != null && LeanTween.isTweening(impactFovTween.id))
+        {
+            LeanTween.cancel(impactFovTween.id);
+        }
+
+        // Greift auf das bestehende lastTargetFOV zurueck, damit der Bounce additiv
+        // zum aktuellen Speed-FOV passiert und nicht mit UpdateFOV() im naechsten Frame kollidiert.
+        float baseTarget = lastTargetFOV;
+        float bouncedFOV = Mathf.Min(baseTarget + impactFovBounceAmount, maxFOV + impactFovBounceAmount);
+
+        playerCamera.fieldOfView = bouncedFOV;
+
+        impactFovTween = LeanTween.value(playerCamera.gameObject, bouncedFOV, baseTarget, impactFovBounceOutDuration)
+            .setUseEstimatedTime(true) // unscaledTime -> Bounce federt auch waehrend Slow-Motion in Echtzeit zurueck
+            .setDelay(impactFovBounceInDuration)
+            .setEase(LeanTweenType.easeOutQuad)
+            .setOnUpdate((float value) =>
+            {
+                playerCamera.fieldOfView = value;
+            })
+            .setOnComplete(() => { impactFovTween = null; });
     }
 
     public void SetTargetWalkingSpeed(float speed)
