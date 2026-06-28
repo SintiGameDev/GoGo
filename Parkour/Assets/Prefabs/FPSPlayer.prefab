@@ -213,7 +213,7 @@ MonoBehaviour:
   disablePlayerCollisionWithGrabbables: 0
   colliderUpdateSmoothness: 5
   safetyMargin: 0.2
-  impactSurfaceBuffer: 0.05
+  impactSurfaceBuffer: 1
   fallbackImpactDistance: 2
   destroyEffect: {fileID: 0}
   grappleSound: {fileID: 0}
