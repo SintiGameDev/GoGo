@@ -9,7 +9,41 @@ public class SC_FPSController : MonoBehaviour
     public float runningSpeed = 11.5f;
     public float jumpSpeed = 8.0f;
     public float wallJumpSpeed = 10.0f;
-    public float gravity = 20.0f;
+    public float gravity = 30.0f;
+
+    [Header("Jump Feel (Rise/Fall Gravity)")]
+    [Tooltip("Multiplier auf 'gravity' waehrend der Spieler nach oben fliegt (steigt)")]
+    public float riseGravityMultiplier = 1.0f;
+    [Tooltip("Multiplier auf 'gravity' waehrend der Spieler faellt -> hoeher = snappier, weniger floaty")]
+    public float fallGravityMultiplier = 1.8f;
+    [Tooltip("Zusaetzlicher Gravity-Multiplier, wenn die Jump-Taste frueh released wird (Variable Jump Height)")]
+    public float lowJumpGravityMultiplier = 2.5f;
+
+    [Header("Coyote Time / Jump Buffer")]
+    [Tooltip("Sprung ist noch X Sekunden nach Verlassen des Bodens erlaubt")]
+    public float coyoteTime = 0.12f;
+    [Tooltip("Jump-Input wird X Sekunden vor Landung 'gemerkt' und beim Landen ausgefuehrt")]
+    public float jumpBufferTime = 0.12f;
+
+    [Header("Air Control")]
+    [Tooltip("Beschleunigung in der Luft relativ zum Boden (1 = gleich, <1 = reduzierte Luft-Beschleunigung)")]
+    [Range(0f, 1f)]
+    public float airControlFactor = 0.7f;
+
+    [Header("Momentum / Inertia")]
+    [Tooltip("Wie schnell die horizontale Velocity dem Input-Ziel folgt (hoeher = direkter, niedriger = mehr Momentum-Erhalt)")]
+    //[Tooltip("Beschleunigung in der Luft (absolut, vor airControlFactor)")]
+    public float airAcceleration = 15f;
+
+    [Header("Wall Jump Momentum")]
+    [Tooltip("Wie viel der horizontalen Velocity vor dem Wall-Jump in den Wall-Jump-Impuls einfliesst (additiv)")]
+    public float wallJumpMomentumRetain = 0.6f;
+
+    [Header("Apex Hang Time")]
+    [Tooltip("Geschwindigkeitsfenster um moveDirection.y == 0, in dem Hang Time greift")]
+    public float apexThreshold = 1.5f;
+    [Tooltip("Gravity-Multiplier waehrend der Apex Hang Time (z.B. 0.5 = halbe Gravity)")]
+    public float apexGravityMultiplier = 0.5f;
     public Camera playerCamera;
     public float lookSpeed = 2.0f;
     public float lookXLimit = 45.0f;
@@ -54,11 +88,35 @@ public class SC_FPSController : MonoBehaviour
     private float lastGroundedTime = 0f;
     private bool wasGroundedLastFrame = false;
 
+    // Variable Jump Height State
+    private bool isJumpCut = false;
+    private bool wasJumpingThisAirtime = false;
+
+    // Jump Buffer State
+    private float jumpBufferTimer = -999f;
+
     // Speed State
     private float targetWalkingSpeed;
     private float targetRunningSpeed;
     private float currentSmoothWalkSpeed;
     private float currentSmoothRunSpeed;
+
+    void OnValidate()
+    {
+        // Verhindert, dass negative/0-Werte im Inspector den Spieler wieder schweben/fliegen lassen
+        gravity = Mathf.Max(0.01f, gravity);
+        riseGravityMultiplier = Mathf.Max(0f, riseGravityMultiplier);
+        fallGravityMultiplier = Mathf.Max(0f, fallGravityMultiplier);
+        lowJumpGravityMultiplier = Mathf.Max(0f, lowJumpGravityMultiplier);
+
+        coyoteTime = Mathf.Max(0f, coyoteTime);
+        jumpBufferTime = Mathf.Max(0f, jumpBufferTime);
+        airControlFactor = Mathf.Clamp01(airControlFactor);
+        airAcceleration = Mathf.Max(0.01f, airAcceleration);
+        wallJumpMomentumRetain = Mathf.Clamp01(wallJumpMomentumRetain);
+        apexThreshold = Mathf.Max(0f, apexThreshold);
+        apexGravityMultiplier = Mathf.Max(0f, apexGravityMultiplier);
+    }
 
     void Start()
     {
@@ -142,23 +200,62 @@ public class SC_FPSController : MonoBehaviour
 
         float movementDirectionY = moveDirection.y;
 
-        moveDirection = (forward * curSpeedX) + (right * curSpeedY);
+        // Momentum/Inertia: horizontale Velocity folgt dem Input-Ziel statt hart gesetzt zu werden.
+        // Am Boden schnellere Acceleration (direkter), in der Luft langsamer (Momentum-Erhalt + Air Control).
+        // isWallGrabbing/isGrappling: Ziel-Geschwindigkeit wird trotzdem berechnet, faehrt aber durch
+        // canMove-Gate oben ohnehin auf 0, falls die jeweilige Logik das vorsieht -> kein Sonderfall noetig.
+        Vector3 targetHorizontalVelocity = (forward * curSpeedX) + (right * curSpeedY);
+        Vector3 currentHorizontalVelocity = new Vector3(moveDirection.x, 0f, moveDirection.z);
+
+        Vector3 newHorizontalVelocity;
+        if (characterController.isGrounded)
+        {
+            // Boden: instant, direkte Kontrolle -- kein Lerp/Trägheit beim normalen Laufen
+            newHorizontalVelocity = targetHorizontalVelocity;
+        }
+        else
+        {
+            // Luft: Momentum-Erhalt + Air Control, damit Sprünge/Wall-Jumps ihren Speed behalten
+            float accel = airAcceleration * Mathf.Max(0.01f, airControlFactor);
+            newHorizontalVelocity = Vector3.MoveTowards(currentHorizontalVelocity, targetHorizontalVelocity, accel * Time.deltaTime);
+        }
+
+        moveDirection = new Vector3(newHorizontalVelocity.x, movementDirectionY, newHorizontalVelocity.z);
 
         // FOV Update
         UpdateFOV();
 
+        // Coyote Time: Sprung bleibt kurz nach Verlassen des Bodens erlaubt
+        bool canUseCoyoteTime = !characterController.isGrounded && GetTimeSinceGrounded() <= coyoteTime;
+        bool groundedOrCoyote = characterController.isGrounded || canUseCoyoteTime;
+
+        // Jump Buffer: Input merken, falls Taste kurz vor dem Landen gedrueckt wurde
+        if (Input.GetButtonDown("Jump"))
+        {
+            jumpBufferTimer = Time.time;
+        }
+        bool hasBufferedJump = (Time.time - jumpBufferTimer) <= jumpBufferTime;
+
+        bool wantsToJump = Input.GetButtonDown("Jump") || hasBufferedJump;
+
         // Jump Logik
-        if (Input.GetButtonDown("Jump") && canMove && !isGrappling && characterController.isGrounded)
+        if (wantsToJump && canMove && !isGrappling && groundedOrCoyote && !isWallGrabbing)
         {
             moveDirection.y = jumpSpeed;
+            isJumpCut = false;
+            wasJumpingThisAirtime = true;
+            jumpBufferTimer = -999f;
 
             if (velocityMultiplier != null)
             {
                 velocityMultiplier.OnJumpAction();
             }
         }
-        else if (Input.GetButtonDown("Jump") && canMove && !isGrappling && isWallGrabbing)
+        else if (wantsToJump && canMove && !isGrappling && isWallGrabbing)
         {
+            isJumpCut = false;
+            wasJumpingThisAirtime = true;
+            jumpBufferTimer = -999f;
             PerformWallJump();
         }
         else
@@ -166,10 +263,50 @@ public class SC_FPSController : MonoBehaviour
             moveDirection.y = movementDirectionY;
         }
 
+        // Variable Jump Height: Taste fruehzeitig losgelassen waehrend Aufstieg -> Jump cutten.
+        // wasJumpingThisAirtime verhindert, dass simples Fallen (z.B. von einer Plattform)
+        // versehentlich als "early release" gewertet wird.
+        if (Input.GetButtonUp("Jump") && wasJumpingThisAirtime && moveDirection.y > 0f)
+        {
+            isJumpCut = true;
+        }
+
+        if (characterController.isGrounded)
+        {
+            wasJumpingThisAirtime = false;
+            isJumpCut = false;
+        }
+
         // Gravity
+        // Rise/Fall-Asymmetrie + Variable Jump Height + Apex Hang Time fuer "snappy" Platformer-Feel.
+        // Wall-Grab behaelt seine eigene reduzierte Gravity und wird NICHT vom Fall-Multiplier ueberschrieben.
         if (!characterController.isGrounded && !isGrappling)
         {
-            float currentGravity = isWallGrabbing ? gravity * 0.3f : gravity;
+            float currentGravity;
+            bool isAtApex = Mathf.Abs(moveDirection.y) <= apexThreshold;
+
+            if (isWallGrabbing)
+            {
+                currentGravity = gravity * 0.3f;
+            }
+            else if (isAtApex && !isJumpCut)
+            {
+                // Apex Hang Time: kurzes Zeitfenster um den Scheitelpunkt mit reduzierter Gravity
+                // fuer praezisere Air-Korrekturen. Greift nicht bei Jump-Cut (soll dort schnell fallen).
+                currentGravity = gravity * Mathf.Max(0f, apexGravityMultiplier);
+            }
+            else if (moveDirection.y > 0f)
+            {
+                // Steigend: normale (oder isJumpCut: verstaerkte) Gravity
+                float riseMult = isJumpCut ? Mathf.Max(riseGravityMultiplier, lowJumpGravityMultiplier) : riseGravityMultiplier;
+                currentGravity = gravity * Mathf.Max(0f, riseMult);
+            }
+            else
+            {
+                // Fallend: immer die staerkere Fall-Gravity
+                currentGravity = gravity * Mathf.Max(0f, fallGravityMultiplier);
+            }
+
             moveDirection.y -= currentGravity * Time.deltaTime;
         }
 
@@ -280,8 +417,22 @@ public class SC_FPSController : MonoBehaviour
         Vector3 jumpDirection = wallNormal.normalized;
         jumpDirection.y = 0;
 
-        moveDirection = jumpDirection * walkingSpeed * 0.5f;
+        // Momentum-Erhalt: Ein Teil der horizontalen Geschwindigkeit VOR dem Wall-Jump
+        // fliesst additiv in den Wall-Jump-Impuls ein, statt komplett verworfen zu werden.
+        // Wichtig: vor jeglichem Reset auslesen, sonst ist die alte Velocity schon weg.
+        Vector3 preJumpHorizontalVelocity = new Vector3(moveDirection.x, 0f, moveDirection.z);
+
+        Vector3 wallJumpImpulse = jumpDirection * walkingSpeed * 0.5f;
+        Vector3 retainedMomentum = preJumpHorizontalVelocity * Mathf.Clamp01(wallJumpMomentumRetain);
+
+        moveDirection = wallJumpImpulse + retainedMomentum;
         moveDirection.y = wallJumpSpeed;
+
+        // Gesamt-Cap bleibt respektiert, falls Momentum + Impuls ueber maxTotalVelocity hinausschiessen
+        if (moveDirection.magnitude > maxTotalVelocity)
+        {
+            moveDirection = moveDirection.normalized * maxTotalVelocity;
+        }
 
         if (velocityMultiplier != null)
         {
