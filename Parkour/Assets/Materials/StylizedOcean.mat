@@ -118,7 +118,7 @@ Material:
     - _LightingSmoothness: 12.34
     - _NormalScale: 0.02
     - _NormalSpeed: 5
-    - _NormalStrength: 5
+    - _NormalStrength: 0
     - _OrthographicCamSize: 0
     - _PERSPECTIVE: 1
     - _PosterizeSteps: 0
@@ -146,13 +146,13 @@ Material:
     - _WaterAlpha: 1
     - _WaterMetallic: 0.559
     - _WaterSmoothness: 0.581
-    - _WaveLength: 1
-    - _WaveRiverLength: 0.2
-    - _WaveRiverWidth: 0.2
-    - _WaveSpeed: 2
+    - _WaveLength: 0
+    - _WaveRiverLength: 0
+    - _WaveRiverWidth: 0
+    - _WaveSpeed: 0
     - _WaveSteepness: 0
     - _WaveStepness: 0.35
-    - _WaveTileSize: 0.02
+    - _WaveTileSize: 0
     m_Colors:
     - _BaseColor: {r: 0, g: 0.1989687, b: 1.110646, a: 1}
     - _CaveColor: {r: 0, g: 0.37303403, b: 0.7830189, a: 0.54509807}
@@ -172,6 +172,6 @@ Material:
     - _TopColor: {r: 0, g: 0.17848217, b: 0.5622641, a: 0.44705883}
     - _UV: {r: 0, g: 0, b: 0, a: 0}
     - _UVRipples: {r: 0, g: 0, b: 0, a: 0}
-    - _WaveDirections: {r: 7.88, g: 4.82, b: 3.29, a: 1.54}
+    - _WaveDirections: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
