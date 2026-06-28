@@ -179,6 +179,18 @@ public class SC_FPSController : MonoBehaviour
 
     void Update()
     {
+        // Wenn der CharacterController extern deaktiviert wurde (z.B. von
+        // SplineGrindHandler während eines Grinds, oder von anderen Skripten,
+        // die per Teleport/Move-Override die Position direkt setzen), darf
+        // diese Methode NICHT weiterlaufen: characterController.Move() auf
+        // einem deaktivierten Controller wirft zwar keine Exception, aber eine
+        // Warnung pro Frame, UND isGrounded/wasGroundedLastFrame würden mit
+        // bedeutungslosen Werten "vergiftet", was nach Reaktivierung einen
+        // fälschlichen OnPlayerLanded()-Call auslösen könnte. Die Bewegungs-
+        // Verantwortung liegt in dieser Zeit komplett beim externen Skript.
+        if (!characterController.enabled)
+            return;
+
         // Grounded State Tracking
         bool isCurrentlyGrounded = characterController.isGrounded;
 
