@@ -73,7 +73,7 @@ MonoBehaviour:
   currentSceneIndex: 3
   transitionDelay: 0.5
   loopScenes: 1
-  showDebugInfo: 1
+  showDebugInfo: 0
 --- !u!1001 &2084988709166294624
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -120,6 +120,14 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2714490622874730202, guid: 568f4e592bd910f4783ee7413448006f, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5922963891066825478, guid: 568f4e592bd910f4783ee7413448006f, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7180509937799552126, guid: 568f4e592bd910f4783ee7413448006f, type: 3}
+      propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7180509937799552126, guid: 568f4e592bd910f4783ee7413448006f, type: 3}

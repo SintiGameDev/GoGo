@@ -199,8 +199,8 @@ MonoBehaviour:
   grabbableLayerMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  highlightColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  highlightIntensity: 10
+  highlightColor: {r: 0.015686274, g: 1, b: 0.94338894, a: 1}
+  highlightIntensity: 2
   useEmission: 1
   minColliderRadius: 1
   maxColliderRadius: 15
