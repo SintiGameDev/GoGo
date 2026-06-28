@@ -46,6 +46,9 @@ public class SplineGrindHandler : MonoBehaviour
     [Tooltip("Vertikaler Offset, damit der Spieler optisch ÜBER der Schiene sitzt statt mittig drin")]
     public float verticalOffset = 0.5f;
 
+    [Tooltip("Dauer der sanften Magnet-Snap-Bewegung zur exakten Spline-Position beim Einstieg, falls der Spieler innerhalb des Magnet-Radius, aber nicht exakt auf der Linie war. Kurz halten (0.1-0.15s), damit es sich wie ein Snap anfühlt statt wie ein spürbarer Sog.")]
+    public float magnetSnapDuration = 0.12f;
+
     [Tooltip("Wie schnell der Spieler-Körper sich in die Spline-Tangentenrichtung dreht (höher = schneller/härter, niedriger = sanfter in Kurven)")]
     public float yawAlignSpeed = 12f;
 
@@ -77,6 +80,15 @@ public class SplineGrindHandler : MonoBehaviour
     private float grindSpeed;
     private float splineLength;
     private float lastGrindEndTime = -999f;
+
+    // Magnet-Snap-Phase: läuft VOR dem regulären FixedUpdate-Grind-Loop, zieht
+    // den Spieler sanft von seiner tatsächlichen Eintritts-Position zur exakten
+    // Spline-Position. Nur aktiv, wenn der Spieler nicht bereits exakt auf der
+    // Linie war (sonst wäre die Distanz ~0 und die Phase ist quasi unsichtbar).
+    private bool isSnapping = false;
+    private float snapStartTime = -999f;
+    private Vector3 snapStartPosition;
+    private Vector3 snapTargetPosition;
 
     // Interpolations-State für flüssige Bewegung: FixedUpdate (fester Tick,
     // z.B. 50Hz) berechnet nur die ZIEL-Position, transform.position wird aber
@@ -117,8 +129,11 @@ public class SplineGrindHandler : MonoBehaviour
     /// startT ist die genaue Einstiegsposition auf der Spline (0..1), fromStart
     /// gibt die Richtung an (true = Richtung t=1, false = Richtung t=0), bereits
     /// aus der Spieler-Bewegungsrichtung von SplineGrindRail bestimmt.
+    /// snapTargetPosition ist der exakte Weltpunkt auf der Spline, zu dem der
+    /// Spieler per Magnet-Snap sanft hingezogen wird, falls er innerhalb des
+    /// (größeren) Magnet-Radius, aber nicht exakt auf der Linie eingestiegen ist.
     /// </summary>
-    public void StartGrind(SplineContainer spline, int splineIndex, bool fromStart, float startT = -1f)
+    public void StartGrind(SplineContainer spline, int splineIndex, bool fromStart, float startT = -1f, Vector3 snapTargetPos = default)
     {
         if (isGrinding) return;
         if (Time.time - lastGrindEndTime < regrindCooldown) return;
@@ -142,16 +157,32 @@ public class SplineGrindHandler : MonoBehaviour
         splineLength = spline.CalculateLength(splineIndex);
         if (splineLength < 0.01f) splineLength = 0.01f;
 
-        // Interpolations-Startwerte auf die aktuelle Spieler-Position setzen (NICHT
-        // auf den Spline-Einstiegspunkt) - sonst würde der Spieler im allerersten
-        // Frame nach StartGrind() sichtbar zu seiner Einstiegsposition "snappen",
-        // bevor der erste FixedUpdate-Tick die Interpolation regulär übernimmt.
-        previousFixedPosition = transform.position;
-        targetFixedPosition = transform.position;
-
         isGrinding = true;
         fpsController.canMove = false;       // blockt Bewegung UND Maus-Yaw im SC_FPSController
         characterController.enabled = false; // EINMAL deaktivieren, kein Toggling pro Frame
+
+        // Magnet-Snap-Phase einleiten: Ziel ist der exakte Spline-Punkt (inkl.
+        // vertikalem Offset), Start ist die tatsächliche aktuelle Position des
+        // Spielers (kann je nach Magnet-Radius spürbar von der Linie abweichen).
+        // Falls snapTargetPos nicht übergeben wurde (default-Aufruf,
+        // Abwärtskompatibilität), direkt auf die aktuelle Position zurückfallen -
+        // dann ist die Distanz 0 und die Snap-Phase läuft quasi unsichtbar durch.
+        Vector3 effectiveSnapTarget = snapTargetPos == default
+            ? transform.position
+            : snapTargetPos;
+        effectiveSnapTarget.y += verticalOffset;
+
+        snapStartPosition = transform.position;
+        snapTargetPosition = effectiveSnapTarget;
+        snapStartTime = Time.time;
+        isSnapping = magnetSnapDuration > 0f && Vector3.Distance(snapStartPosition, snapTargetPosition) > 0.01f;
+
+        // Interpolations-Startwerte auf die aktuelle Spieler-Position setzen (egal
+        // ob Snap-Phase aktiv ist oder nicht) - sonst würde der Spieler im
+        // allerersten Frame nach StartGrind() sichtbar zu seiner Einstiegsposition
+        // "springen", bevor die Snap-Phase bzw. der reguläre Loop übernimmt.
+        previousFixedPosition = transform.position;
+        targetFixedPosition = transform.position;
 
         // Aktuellen Kamera-Pitch übernehmen, damit die Pitch-Steuerung während des
         // Grinds dort weitermacht, wo der Spieler vorher war
@@ -163,7 +194,12 @@ public class SplineGrindHandler : MonoBehaviour
         }
 
         if (showDebugInfo)
-            Debug.Log($"🛤️ Grind gestartet! Richtung: {(forward ? "vorwärts" : "rückwärts")} | Speed: {grindSpeed:F1} m/s | Bahnlänge: {splineLength:F1} m");
+        {
+            string snapInfo = isSnapping
+                ? $" | Magnet-Snap: {Vector3.Distance(snapStartPosition, snapTargetPosition):F2}m über {magnetSnapDuration:F2}s"
+                : "";
+            Debug.Log($"🛤️ Grind gestartet! Richtung: {(forward ? "vorwärts" : "rückwärts")} | Speed: {grindSpeed:F1} m/s | Bahnlänge: {splineLength:F1} m{snapInfo}");
+        }
     }
 
     void Update()
@@ -176,6 +212,16 @@ public class SplineGrindHandler : MonoBehaviour
         // und in FixedUpdate-Schritten holprig wirkt.
         HandleCameraPitchInput();
 
+        if (isSnapping)
+        {
+            // Während der kurzen Magnet-Snap-Phase NICHT den regulären Grind-
+            // Loop laufen lassen (kein Frühausstieg, keine Spline-Bewegung) -
+            // der Spieler wird erst sanft zur Linie gezogen, bevor der
+            // eigentliche Grind beginnt.
+            UpdateMagnetSnap();
+            return;
+        }
+
         // Frühausstieg per Leertaste
         if (Input.GetButtonDown("Jump"))
         {
@@ -183,6 +229,45 @@ public class SplineGrindHandler : MonoBehaviour
         }
 
         InterpolatePosition();
+    }
+
+    /// <summary>
+    /// Bewegt den Spieler sanft von snapStartPosition zu snapTargetPosition über
+    /// magnetSnapDuration. Läuft in Update() (nicht FixedUpdate), da die Snap-
+    /// Phase sehr kurz ist (0.1-0.15s) und von der Bildschirm-Framerate profitiert,
+    /// nicht vom festen Physik-Tick. Geht danach nahtlos in den regulären
+    /// FixedUpdate-Grind-Loop über (EndMagnetSnap setzt die Interpolations-
+    /// Startwerte dafür neu).
+    /// </summary>
+    void UpdateMagnetSnap()
+    {
+        float elapsed = Time.time - snapStartTime;
+
+        if (elapsed >= magnetSnapDuration)
+        {
+            transform.position = snapTargetPosition;
+            EndMagnetSnap();
+            return;
+        }
+
+        float t = elapsed / magnetSnapDuration;
+        // EaseOut: schnell am Anfang, sanft einrastend am Ende - fühlt sich wie
+        // ein kurzer "Sog" an, der dann weich zum Stillstand auf der Linie kommt.
+        float eased = 1f - Mathf.Pow(1f - t, 3f);
+        transform.position = Vector3.Lerp(snapStartPosition, snapTargetPosition, eased);
+    }
+
+    /// <summary>
+    /// Übergibt von der Snap-Phase in den regulären FixedUpdate-Grind-Loop.
+    /// Setzt die Interpolations-Startwerte auf die jetzt exakte Spline-Position,
+    /// damit InterpolatePosition() im nächsten Update() nicht plötzlich von der
+    /// alten (Snap-Start-)Position aus zu interpolieren versucht.
+    /// </summary>
+    void EndMagnetSnap()
+    {
+        isSnapping = false;
+        previousFixedPosition = transform.position;
+        targetFixedPosition = transform.position;
     }
 
     /// <summary>
@@ -211,6 +296,7 @@ public class SplineGrindHandler : MonoBehaviour
     void FixedUpdate()
     {
         if (!isGrinding) return;
+        if (isSnapping) return; // Snap-Phase läuft komplett in Update(), siehe UpdateMagnetSnap()
 
         // Vorherige Zielposition merken, BEVOR currentT weiterläuft - das ist
         // der Ausgangspunkt für die Interpolation in Update() bis zum nächsten Tick.
