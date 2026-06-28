@@ -194,7 +194,7 @@ MonoBehaviour:
   grabbableTag: Grabbable
   slowMotionTimeScale: 0.2
   slowMotionDuration: 0.02
-  autoJumpForce: 20
+  autoJumpForce: 40
   heightDeltaToEndSlowMo: 0.5
   maxGrappleDistance: 40
   playerCamera: {fileID: 2304776757904105273}
@@ -204,16 +204,16 @@ MonoBehaviour:
   highlightColor: {r: 0.015686274, g: 1, b: 0.94338894, a: 1}
   highlightIntensity: 0.4
   useEmission: 1
-  minColliderRadius: 1
-  maxColliderRadius: 15
-  minScaleDistance: 5
+  minColliderRadius: 3
+  maxColliderRadius: 8
+  minScaleDistance: 2
   maxScaleDistance: 100
   enableDynamicColliders: 1
   useTriggersInsteadOfColliders: 1
   disablePlayerCollisionWithGrabbables: 0
   colliderUpdateSmoothness: 5
   safetyMargin: 0.2
-  impactSurfaceBuffer: 1
+  impactSurfaceBuffer: 5
   fallbackImpactDistance: 2
   destroyEffect: {fileID: 0}
   grappleSound: {fileID: 0}
@@ -231,12 +231,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1fd1baa6c1294c2468ff5068aa489325, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  walkingSpeed: 16
-  runningSpeed: 27
-  jumpSpeed: 30
-  wallJumpSpeed: 30
-  gravity: 50
-  maxLeanAngle: 2
+  walkingSpeed: 25
+  runningSpeed: 36
+  jumpSpeed: 60
+  wallJumpSpeed: 60
+  gravity: 80
+  maxLeanAngle: 3
   leanSpeed: 12
   riseGravityMultiplier: 1.1
   fallGravityMultiplier: 2
@@ -392,10 +392,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   fastestJumpInterval: 0.3
   slowestJumpInterval: 1.5
-  maxBoostPerJump: 0.5
-  minBoostPerJump: 0.2
-  maxComboMultiplier: 3
-  boostHoldDuration: 1
+  maxBoostPerJump: 0.8
+  minBoostPerJump: 0.1
+  maxComboMultiplier: 6
+  boostHoldDuration: 2
   decayRate: 0.5
   showDebugInfo: 0
 --- !u!114 &2521946580280787812
