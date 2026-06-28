@@ -116,7 +116,7 @@ Material:
     - _OcclusionStrength: 1
     - _OctaveGain: 0.5
     - _OctaveLacunarity: 2
-    - _Octaves: 1
+    - _Octaves: 2
     - _Parallax: 0.005
     - _QueueControl: 0
     - _QueueOffset: 0
