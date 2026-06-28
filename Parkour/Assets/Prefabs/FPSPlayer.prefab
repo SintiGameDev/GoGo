@@ -19,7 +19,8 @@ GameObject:
   - component: {fileID: 375951632665203206}
   - component: {fileID: 2584267313266014871}
   - component: {fileID: 8216699775367567169}
-  - component: {fileID: 2864634214651279333}
+  - component: {fileID: 2521946580280787812}
+  - component: {fileID: 1003731328612656483}
   m_Layer: 0
   m_Name: FPSPlayer
   m_TagString: Player
@@ -377,7 +378,7 @@ MonoBehaviour:
   maxComboMultiplier: 3
   boostHoldDuration: 1
   decayRate: 0.5
---- !u!114 &2864634214651279333
+--- !u!114 &2521946580280787812
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -393,10 +394,10 @@ MonoBehaviour:
   characterController: {fileID: 0}
   playerCamera: {fileID: 0}
   velocityMultiplier: {fileID: 0}
-  minGrindSpeed: 50
-  maxGrindSpeed: 70
-  entrySpeedMultiplier: 1.2
-  verticalOffset: 0
+  minGrindSpeed: 20
+  maxGrindSpeed: 45
+  entrySpeedMultiplier: 1.5
+  verticalOffset: 0.5
   yawAlignSpeed: 12
   regrindCooldown: 0.3
   earlyExitForwardBoost: 25
@@ -404,6 +405,27 @@ MonoBehaviour:
   lookSpeed: 2
   lookXLimit: 45
   showDebugInfo: 1
+--- !u!114 &1003731328612656483
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1036552637450684959}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee8707d1f4ee13d4289ebb2e6737a890, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  speedThresholdMin: 15
+  speedThresholdMax: 30
+  intensityLerpSpeed: 6
+  lineCount: 24
+  lineScrollSpeed: 1.2
+  innerRadius: 0.35
+  lineColor: {r: 1, g: 1, b: 1, a: 0.6}
+  factorInJumpBoost: 1
+  jumpBoostInfluence: 0.5
 --- !u!1 &2876241451336742777
 GameObject:
   m_ObjectHideFlags: 0

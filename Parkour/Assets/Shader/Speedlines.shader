@@ -1,4 +1,4 @@
-Shader "Hidden/Speedlines"
+Shader "Custom/Speedlines"
 {
     Properties
     {
@@ -18,6 +18,13 @@ Shader "Hidden/Speedlines"
             #pragma vertex Vert
             #pragma fragment Frag
 
+            // WICHTIG: Core.hlsl muss VOR Blit.hlsl includet werden, da dort
+            // TEXTURE2D_X / SAMPLE_TEXTURE2D_X und _BlitTexture definiert werden.
+            // Ohne diesen Include kennt der Compiler diese Makros nicht ->
+            // "unrecognized identifier 'TEXTURE2D_X'".
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
 
             // Wird global per Shader.SetGlobalFloat von SpeedlinesController gesetzt
