@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 3204075215474133779}
   - component: {fileID: 1127173925831150547}
   - component: {fileID: 7387719386310448550}
+  - component: {fileID: 8035191151553368314}
   m_Layer: 0
   m_Name: AudioManager
   m_TagString: Untagged
@@ -52,8 +53,8 @@ AudioSource:
   m_Enabled: 1
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
-  m_audioClip: {fileID: 8300000, guid: 5f95c5a45d64ca744bdda72bc3fcf3b5, type: 3}
-  m_Resource: {fileID: 8300000, guid: 5f95c5a45d64ca744bdda72bc3fcf3b5, type: 3}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
   m_PlayOnAwake: 1
   m_Volume: 1
   m_Pitch: 1
@@ -151,6 +152,44 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 174f9bc29fd409d4590e8a3bc149a6d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  playlist:
+  - {fileID: 8300000, guid: fc2949c4ba8e61f4cab8b9d5625f89d7, type: 3}
+  - {fileID: 8300000, guid: 4f62df1b0e34c604e965018cc090bd3c, type: 3}
+  - {fileID: 8300000, guid: ae3c566c9b1233641a0e1e90d4acf5a1, type: 3}
+  - {fileID: 8300000, guid: 220e32ca56e744449b77345fb8d0e6b7, type: 3}
+  - {fileID: 8300000, guid: e0357af45bdfbff4fb65cdcc90fedf79, type: 3}
+  - {fileID: 8300000, guid: 481bd7e299dd562419d215a09d638db1, type: 3}
+  - {fileID: 8300000, guid: 5c46f68614e67e54e9571d75ca088feb, type: 3}
+  crossfadeDuration: 3
+  maxVolume: 1
+--- !u!114 &8035191151553368314
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7393181769380031265}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 504343dce90d47848a49f7d53cd6ef7a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  schlaegeProMinute: 74.3
+  grundton: 77
+  masterLautstaerke: 1.4
+  padLautstaerke: 0.35
+  bassLautstaerke: 0.25
+  beatLautstaerke: 0.22
+  arpeggioLautstaerke: 0.18
+  delayFeedback: 0.55
+  delayZeitSekunden: 0.55
+  delayMix: 0.443
+  chorusDetuneCent: 7
+  chorusRateHz: 0.15
+  filterCutoffHz: 2200
+  filterLfoTiefeHz: 900
+  filterLfoRateHz: 0.07
+  lofiSampleHold: 1
 --- !u!1 &8049851210380143939
 GameObject:
   m_ObjectHideFlags: 0
