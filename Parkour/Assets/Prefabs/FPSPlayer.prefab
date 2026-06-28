@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 375951632665203206}
   - component: {fileID: 2584267313266014871}
   - component: {fileID: 8216699775367567169}
+  - component: {fileID: 2864634214651279333}
   m_Layer: 0
   m_Name: FPSPlayer
   m_TagString: Player
@@ -376,6 +377,33 @@ MonoBehaviour:
   maxComboMultiplier: 3
   boostHoldDuration: 1
   decayRate: 0.5
+--- !u!114 &2864634214651279333
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1036552637450684959}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3dc1932ace1eebb4d9fd1c0b709dc47e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fpsController: {fileID: 0}
+  characterController: {fileID: 0}
+  playerCamera: {fileID: 0}
+  velocityMultiplier: {fileID: 0}
+  minGrindSpeed: 50
+  maxGrindSpeed: 70
+  entrySpeedMultiplier: 1.2
+  verticalOffset: 0
+  yawAlignSpeed: 12
+  regrindCooldown: 0.3
+  earlyExitForwardBoost: 25
+  earlyExitUpwardBoost: 10
+  lookSpeed: 2
+  lookXLimit: 45
+  showDebugInfo: 1
 --- !u!1 &2876241451336742777
 GameObject:
   m_ObjectHideFlags: 0
