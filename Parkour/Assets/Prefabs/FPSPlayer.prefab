@@ -192,6 +192,7 @@ MonoBehaviour:
   grappleSpeed: 500
   killRadius: 2
   grabbableTag: Grabbable
+  momentumRetentionMultiplier: 0.8
   slowMotionTimeScale: 0.2
   slowMotionDuration: 0.02
   autoJumpForce: 40
@@ -264,6 +265,13 @@ MonoBehaviour:
   maxFOV: 90
   fovChangeDuration: 0.2
   fovSpeedThreshold: 15
+  impactFlashImage: {fileID: 0}
+  impactFlashInDuration: 0.04
+  impactFlashOutDuration: 0.18
+  impactFlashMaxAlpha: 0.85
+  impactFovBounceAmount: 12
+  impactFovBounceInDuration: 0.05
+  impactFovBounceOutDuration: 0.25
   speedTransitionRate: 50
   maxTotalVelocity: 85
   canMove: 1
@@ -491,14 +499,14 @@ Camera:
   serializedVersion: 2
   m_ClearFlags: 1
   m_BackGroundColor: {r: 0.122774996, g: 0.5727955, b: 0.8396226, a: 0}
-  m_projectionMatrixMode: 1
+  m_projectionMatrixMode: 2
   m_GateFitMode: 2
   m_FOVAxisMode: 0
   m_Iso: 200
   m_ShutterSpeed: 0.005
   m_Aperture: 16
   m_FocusDistance: 10
-  m_FocalLength: 50
+  m_FocalLength: 17.137775
   m_BladeCount: 5
   m_Curvature: {x: 2, y: 11}
   m_BarrelClipping: 0.25
@@ -513,7 +521,7 @@ Camera:
     height: 1
   near clip plane: 0.01
   far clip plane: 1000
-  field of view: 70
+  field of view: 70.00001
   orthographic: 0
   orthographic size: 5
   m_Depth: 0

@@ -1,0 +1,474 @@
+Shader "Custom/TraumweltDeformTess"
+{
+    Properties
+    {
+        [Header(Surface)]
+        _BaseColor   ("Base Color", Color) = (0.5, 0.5, 0.6, 1)
+        _Smoothness  ("Smoothness", Range(0,1)) = 0.5
+        _Metallic    ("Metallic", Range(0,1)) = 0.0
+
+        [Header(Displacement)]
+        _NoiseScale  ("Noise Scale", Float) = 2.0
+        _NoiseAmp    ("Displacement Amount", Float) = 0.2
+        _NoiseSpeed  ("Flow Speed", Float) = 0.5
+        _NormalEps   ("Normal Sample Offset", Range(0.001, 0.2)) = 0.02
+
+        [Header(Tessellation)]
+        _TessFactor  ("Tessellation Factor", Range(1, 64)) = 16
+        _TessMinDist ("Tess Min Distance", Float) = 2.0
+        _TessMaxDist ("Tess Max Distance", Float) = 25.0
+    }
+
+    SubShader
+    {
+        Tags { "RenderType"="Opaque" "RenderPipeline"="UniversalPipeline" }
+        LOD 300
+
+        // ---------------------------------------------------------------
+        HLSLINCLUDE
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+        CBUFFER_START(UnityPerMaterial)
+            float4 _BaseColor;
+            float  _Smoothness;
+            float  _Metallic;
+            float  _NoiseScale;
+            float  _NoiseAmp;
+            float  _NoiseSpeed;
+            float  _NormalEps;
+            float  _TessFactor;
+            float  _TessMinDist;
+            float  _TessMaxDist;
+        CBUFFER_END
+
+        // --- 3D Simplex Noise (Ashima / Stefan Gustavson, public domain) ---
+        float3 mod289(float3 x) { return x - floor(x * (1.0/289.0)) * 289.0; }
+        float4 mod289(float4 x) { return x - floor(x * (1.0/289.0)) * 289.0; }
+        float4 permute(float4 x) { return mod289(((x*34.0)+1.0)*x); }
+        float4 taylorInvSqrt(float4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+        float snoise(float3 v)
+        {
+            const float2 C = float2(1.0/6.0, 1.0/3.0);
+            const float4 D = float4(0.0, 0.5, 1.0, 2.0);
+
+            float3 i  = floor(v + dot(v, C.yyy));
+            float3 x0 = v - i + dot(i, C.xxx);
+
+            float3 g = step(x0.yzx, x0.xyz);
+            float3 l = 1.0 - g;
+            float3 i1 = min(g.xyz, l.zxy);
+            float3 i2 = max(g.xyz, l.zxy);
+
+            float3 x1 = x0 - i1 + C.xxx;
+            float3 x2 = x0 - i2 + C.yyy;
+            float3 x3 = x0 - D.yyy;
+
+            i = mod289(i);
+            float4 p = permute(permute(permute(
+                      i.z + float4(0.0, i1.z, i2.z, 1.0))
+                    + i.y + float4(0.0, i1.y, i2.y, 1.0))
+                    + i.x + float4(0.0, i1.x, i2.x, 1.0));
+
+            float n_ = 0.142857142857;
+            float3 ns = n_ * D.wyz - D.xzx;
+
+            float4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+            float4 x_ = floor(j * ns.z);
+            float4 y_ = floor(j - 7.0 * x_);
+
+            float4 x = x_ * ns.x + ns.yyyy;
+            float4 y = y_ * ns.x + ns.yyyy;
+            float4 h = 1.0 - abs(x) - abs(y);
+
+            float4 b0 = float4(x.xy, y.xy);
+            float4 b1 = float4(x.zw, y.zw);
+
+            float4 s0 = floor(b0) * 2.0 + 1.0;
+            float4 s1 = floor(b1) * 2.0 + 1.0;
+            float4 sh = -step(h, float4(0,0,0,0));
+
+            float4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+            float4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+            float3 p0 = float3(a0.xy, h.x);
+            float3 p1 = float3(a0.zw, h.y);
+            float3 p2 = float3(a1.xy, h.z);
+            float3 p3 = float3(a1.zw, h.w);
+
+            float4 norm = taylorInvSqrt(float4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+            p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+
+            float4 m = max(0.6 - float4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+            m = m * m;
+            return 42.0 * dot(m*m, float4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+        }
+
+        float DisplacementAt(float3 posOS)
+        {
+            float3 samplePos = posOS * _NoiseScale + _Time.y * _NoiseSpeed;
+            return snoise(samplePos) * _NoiseAmp;
+        }
+
+        // Deformierte Position + neu berechnete Normale (finite differences).
+        void Deform(float3 posOS, float3 normalOS, out float3 outPos, out float3 outNormal)
+        {
+            float d = DisplacementAt(posOS);
+            outPos = posOS + normalOS * d;
+
+            float3 tangent   = normalize(cross(normalOS, float3(0,1,0) + float3(0.001,0,0)));
+            float3 bitangent = normalize(cross(normalOS, tangent));
+
+            float eps = _NormalEps;
+            float3 pT = posOS + tangent   * eps;
+            float3 pB = posOS + bitangent * eps;
+
+            float dT = DisplacementAt(pT);
+            float dB = DisplacementAt(pB);
+
+            float3 displacedT = pT + normalOS * dT;
+            float3 displacedB = pB + normalOS * dB;
+
+            float3 newT = displacedT - outPos;
+            float3 newB = displacedB - outPos;
+
+            outNormal = normalize(cross(newT, newB));
+            if (dot(outNormal, normalOS) < 0) outNormal = -outNormal;
+        }
+
+        // --- Tessellation: pro Kante Faktor aus Distanz zur Kamera ---
+        float EdgeTessFactor(float3 p0WS, float3 p1WS)
+        {
+            float3 edgeMid = (p0WS + p1WS) * 0.5;
+            float dist = distance(edgeMid, GetCameraPositionWS());
+            float f = 1.0 - saturate((dist - _TessMinDist) / max(_TessMaxDist - _TessMinDist, 0.0001));
+            return lerp(1.0, _TessFactor, f);
+        }
+        ENDHLSL
+
+        // ============================ FORWARD =============================
+        Pass
+        {
+            Name "ForwardLit"
+            Tags { "LightMode"="UniversalForward" }
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma hull hull
+            #pragma domain domain
+            #pragma fragment frag
+            #pragma target 5.0
+
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_SCREEN
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS   : NORMAL;
+            };
+
+            // Control point (Vertex -> Hull)
+            struct TessControl
+            {
+                float3 positionOS : INTERNALTESSPOS;
+                float3 normalOS   : NORMAL;
+            };
+
+            struct HSConstant
+            {
+                float edges[3]  : SV_TessFactor;
+                float inside    : SV_InsideTessFactor;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 positionWS : TEXCOORD0;
+                float3 normalWS   : TEXCOORD1;
+            };
+
+            // Pass-through Vertex
+            TessControl vert (Attributes IN)
+            {
+                TessControl OUT;
+                OUT.positionOS = IN.positionOS.xyz;
+                OUT.normalOS   = normalize(IN.normalOS);
+                return OUT;
+            }
+
+            // Patch-Constant
+            HSConstant PatchConstant (InputPatch<TessControl, 3> patch)
+            {
+                HSConstant o;
+                float3 w0 = TransformObjectToWorld(patch[0].positionOS);
+                float3 w1 = TransformObjectToWorld(patch[1].positionOS);
+                float3 w2 = TransformObjectToWorld(patch[2].positionOS);
+
+                o.edges[0] = EdgeTessFactor(w1, w2);
+                o.edges[1] = EdgeTessFactor(w2, w0);
+                o.edges[2] = EdgeTessFactor(w0, w1);
+                o.inside   = (o.edges[0] + o.edges[1] + o.edges[2]) / 3.0;
+                return o;
+            }
+
+            [domain("tri")]
+            [partitioning("fractional_odd")]
+            [outputtopology("triangle_cw")]
+            [outputcontrolpoints(3)]
+            [patchconstantfunc("PatchConstant")]
+            TessControl hull (InputPatch<TessControl, 3> patch, uint id : SV_OutputControlPointID)
+            {
+                return patch[id];
+            }
+
+            [domain("tri")]
+            Varyings domain (HSConstant cdata, const OutputPatch<TessControl, 3> patch,
+                             float3 bary : SV_DomainLocation)
+            {
+                float3 posOS = patch[0].positionOS * bary.x
+                             + patch[1].positionOS * bary.y
+                             + patch[2].positionOS * bary.z;
+                float3 nrmOS = normalize(patch[0].normalOS * bary.x
+                             + patch[1].normalOS * bary.y
+                             + patch[2].normalOS * bary.z);
+
+                float3 dPos, dNrm;
+                Deform(posOS, nrmOS, dPos, dNrm);
+
+                Varyings OUT;
+                VertexPositionInputs posInputs = GetVertexPositionInputs(dPos);
+                OUT.positionCS = posInputs.positionCS;
+                OUT.positionWS = posInputs.positionWS;
+                OUT.normalWS   = TransformObjectToWorldNormal(dNrm);
+                return OUT;
+            }
+
+            half4 frag (Varyings IN) : SV_Target
+            {
+                InputData inputData = (InputData)0;
+                inputData.positionWS = IN.positionWS;
+                inputData.normalWS   = normalize(IN.normalWS);
+                inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(IN.positionWS);
+                inputData.shadowCoord = TransformWorldToShadowCoord(IN.positionWS);
+
+                SurfaceData surfaceData = (SurfaceData)0;
+                surfaceData.albedo     = _BaseColor.rgb;
+                surfaceData.metallic   = _Metallic;
+                surfaceData.smoothness = _Smoothness;
+                surfaceData.alpha      = 1.0;
+                surfaceData.occlusion  = 1.0;
+
+                return UniversalFragmentPBR(inputData, surfaceData);
+            }
+            ENDHLSL
+        }
+
+        // ========================= SHADOW CASTER ==========================
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode"="ShadowCaster" }
+
+            ZWrite On
+            ZTest LEqual
+            ColorMask 0
+            Cull Back
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma hull hull
+            #pragma domain domain
+            #pragma fragment fragShadow
+            #pragma target 5.0
+
+            // Lighting.hlsl laedt Core + Shadows in korrekter Reihenfolge
+            // (liefert ApplyShadowBias UND LerpWhiteTo).
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            float3 _LightDirection;
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS   : NORMAL;
+            };
+
+            struct TessControl
+            {
+                float3 positionOS : INTERNALTESSPOS;
+                float3 normalOS   : NORMAL;
+            };
+
+            struct HSConstant
+            {
+                float edges[3]  : SV_TessFactor;
+                float inside    : SV_InsideTessFactor;
+            };
+
+            struct Varyings { float4 positionCS : SV_POSITION; };
+
+            TessControl vert (Attributes IN)
+            {
+                TessControl OUT;
+                OUT.positionOS = IN.positionOS.xyz;
+                OUT.normalOS   = normalize(IN.normalOS);
+                return OUT;
+            }
+
+            HSConstant PatchConstant (InputPatch<TessControl, 3> patch)
+            {
+                HSConstant o;
+                float3 w0 = TransformObjectToWorld(patch[0].positionOS);
+                float3 w1 = TransformObjectToWorld(patch[1].positionOS);
+                float3 w2 = TransformObjectToWorld(patch[2].positionOS);
+                o.edges[0] = EdgeTessFactor(w1, w2);
+                o.edges[1] = EdgeTessFactor(w2, w0);
+                o.edges[2] = EdgeTessFactor(w0, w1);
+                o.inside   = (o.edges[0] + o.edges[1] + o.edges[2]) / 3.0;
+                return o;
+            }
+
+            [domain("tri")]
+            [partitioning("fractional_odd")]
+            [outputtopology("triangle_cw")]
+            [outputcontrolpoints(3)]
+            [patchconstantfunc("PatchConstant")]
+            TessControl hull (InputPatch<TessControl, 3> patch, uint id : SV_OutputControlPointID)
+            {
+                return patch[id];
+            }
+
+            [domain("tri")]
+            Varyings domain (HSConstant cdata, const OutputPatch<TessControl, 3> patch,
+                             float3 bary : SV_DomainLocation)
+            {
+                float3 posOS = patch[0].positionOS * bary.x
+                             + patch[1].positionOS * bary.y
+                             + patch[2].positionOS * bary.z;
+                float3 nrmOS = normalize(patch[0].normalOS * bary.x
+                             + patch[1].normalOS * bary.y
+                             + patch[2].normalOS * bary.z);
+
+                float3 dPos, dNrm;
+                Deform(posOS, nrmOS, dPos, dNrm);
+
+                float3 positionWS = TransformObjectToWorld(dPos);
+                float3 normalWS   = TransformObjectToWorldNormal(dNrm);
+
+                float4 clip = TransformWorldToHClip(
+                    ApplyShadowBias(positionWS, normalWS, _LightDirection));
+
+                #if UNITY_REVERSED_Z
+                    clip.z = min(clip.z, UNITY_NEAR_CLIP_VALUE);
+                #else
+                    clip.z = max(clip.z, UNITY_NEAR_CLIP_VALUE);
+                #endif
+
+                Varyings OUT;
+                OUT.positionCS = clip;
+                return OUT;
+            }
+
+            half4 fragShadow (Varyings IN) : SV_Target { return 0; }
+            ENDHLSL
+        }
+
+        // ============================ DEPTH ===============================
+        Pass
+        {
+            Name "DepthOnly"
+            Tags { "LightMode"="DepthOnly" }
+
+            ZWrite On
+            ColorMask 0
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma hull hull
+            #pragma domain domain
+            #pragma fragment fragDepth
+            #pragma target 5.0
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS   : NORMAL;
+            };
+
+            struct TessControl
+            {
+                float3 positionOS : INTERNALTESSPOS;
+                float3 normalOS   : NORMAL;
+            };
+
+            struct HSConstant
+            {
+                float edges[3]  : SV_TessFactor;
+                float inside    : SV_InsideTessFactor;
+            };
+
+            struct Varyings { float4 positionCS : SV_POSITION; };
+
+            TessControl vert (Attributes IN)
+            {
+                TessControl OUT;
+                OUT.positionOS = IN.positionOS.xyz;
+                OUT.normalOS   = normalize(IN.normalOS);
+                return OUT;
+            }
+
+            HSConstant PatchConstant (InputPatch<TessControl, 3> patch)
+            {
+                HSConstant o;
+                float3 w0 = TransformObjectToWorld(patch[0].positionOS);
+                float3 w1 = TransformObjectToWorld(patch[1].positionOS);
+                float3 w2 = TransformObjectToWorld(patch[2].positionOS);
+                o.edges[0] = EdgeTessFactor(w1, w2);
+                o.edges[1] = EdgeTessFactor(w2, w0);
+                o.edges[2] = EdgeTessFactor(w0, w1);
+                o.inside   = (o.edges[0] + o.edges[1] + o.edges[2]) / 3.0;
+                return o;
+            }
+
+            [domain("tri")]
+            [partitioning("fractional_odd")]
+            [outputtopology("triangle_cw")]
+            [outputcontrolpoints(3)]
+            [patchconstantfunc("PatchConstant")]
+            TessControl hull (InputPatch<TessControl, 3> patch, uint id : SV_OutputControlPointID)
+            {
+                return patch[id];
+            }
+
+            [domain("tri")]
+            Varyings domain (HSConstant cdata, const OutputPatch<TessControl, 3> patch,
+                             float3 bary : SV_DomainLocation)
+            {
+                float3 posOS = patch[0].positionOS * bary.x
+                             + patch[1].positionOS * bary.y
+                             + patch[2].positionOS * bary.z;
+                float3 nrmOS = normalize(patch[0].normalOS * bary.x
+                             + patch[1].normalOS * bary.y
+                             + patch[2].normalOS * bary.z);
+
+                float3 dPos, dNrm;
+                Deform(posOS, nrmOS, dPos, dNrm);
+
+                Varyings OUT;
+                OUT.positionCS = TransformObjectToHClip(dPos);
+                return OUT;
+            }
+
+            half4 fragDepth (Varyings IN) : SV_Target { return 0; }
+            ENDHLSL
+        }
+    }
+    FallBack "Hide/InternalErrorShader"
+}
