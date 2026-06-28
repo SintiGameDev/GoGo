@@ -33,8 +33,11 @@ public class SplineGrindRail : MonoBehaviour
     [Tooltip("Tag des Spielers, der die Bahn auslösen darf")]
     public string playerTag = "Player";
 
-    [Tooltip("Radius der Kapsel-Collider entlang der Bahn (= wie nah der Spieler an die Schiene muss)")]
+    [Tooltip("Visueller Referenzwert für die 'enge' Spur der Bahn (nur für Gizmo-Anzeige relevant, bestimmt NICHT mehr die tatsächliche Collider-Größe - siehe magnetRadius)")]
     public float railRadius = 0.6f;
+
+    [Tooltip("Magnet-Radius: tatsächliche Distanz, innerhalb der der Spieler die Bahn auslöst und zu ihr hingezogen wird, OHNE exakt auf der Linie landen zu müssen. Größer als railRadius = mehr Toleranz beim Einstieg. Bestimmt die tatsächliche Größe der Kapsel-Collider entlang der Bahn.")]
+    public float magnetRadius = 1.5f;
 
     [Tooltip("Anzahl der Segmente, in die die Bahn für die Trigger-Kette unterteilt wird. Höher = genauere Anschmiegung an Kurven, aber mehr Collider-Objekte.")]
     public int segmentCount = 20;
@@ -103,9 +106,9 @@ public class SplineGrindRail : MonoBehaviour
 
         CapsuleCollider col = segObj.AddComponent<CapsuleCollider>();
         col.isTrigger = true;
-        col.radius = railRadius;
+        col.radius = magnetRadius;
         col.direction = 1; // Y-Achse (lokal)
-        col.height = Mathf.Max(segmentLength, railRadius * 2f);
+        col.height = Mathf.Max(segmentLength, magnetRadius * 2f);
 
         SplineGrindSegmentTrigger segTrigger = segObj.AddComponent<SplineGrindSegmentTrigger>();
         segTrigger.Initialize(this, tStart, tEnd, tMid, playerTag);
@@ -133,16 +136,21 @@ public class SplineGrindRail : MonoBehaviour
         // Aufruf etwas teurer ist und wir nur innerhalb eines kurzen Segments suchen)
         float nearestT = FindNearestTOnSegment(player.transform.position, tStart, tEnd);
 
+        // Magnet-Snap-Zielposition: der exakte Punkt auf der Spline, zu dem der
+        // Spieler beim Einstieg sanft hingezogen wird, falls er innerhalb des
+        // (größeren) magnetRadius, aber nicht exakt auf der Linie war.
+        Vector3 snapTargetPosition = (Vector3)splineContainer.EvaluatePosition(splineIndex, nearestT);
+
         // Bewegungsrichtung des Spielers ermitteln
         CharacterController cc = player.GetComponentInParent<CharacterController>();
         Vector3 playerVelocity = cc != null ? cc.velocity : Vector3.zero;
 
         bool movingForward = DetermineDirectionFromVelocity(playerVelocity, nearestT);
 
-        handler.StartGrind(splineContainer, splineIndex, movingForward, nearestT);
+        handler.StartGrind(splineContainer, splineIndex, movingForward, nearestT, snapTargetPosition);
 
         if (showDebugInfo)
-            Debug.Log($"🛤️ SplineGrindRail: Einstieg bei t={nearestT:F2} ({(movingForward ? "vorwärts" : "rückwärts")}), Spieler-Speed: {playerVelocity.magnitude:F1} m/s");
+            Debug.Log($"🛤️ SplineGrindRail: Einstieg bei t={nearestT:F2} ({(movingForward ? "vorwärts" : "rückwärts")}), Spieler-Speed: {playerVelocity.magnitude:F1} m/s | Magnet-Distanz: {Vector3.Distance(player.transform.position, snapTargetPosition):F2}m");
     }
 
     /// <summary>
@@ -207,9 +215,21 @@ public class SplineGrindRail : MonoBehaviour
             prev = point;
         }
 
-        // Trigger-Radius entlang der Bahn als halbtransparente Indikation zeigen
+        // Trigger-Radius entlang der Bahn als halbtransparente Indikation zeigen -
+        // jetzt der MAGNET-Radius (tatsächliche Collider-Größe), nicht mehr railRadius
         Gizmos.color = new Color(gizmoColor.r, gizmoColor.g, gizmoColor.b, 0.25f);
         int radiusSamples = 12;
+        for (int i = 0; i <= radiusSamples; i++)
+        {
+            float t = i / (float)radiusSamples;
+            Vector3 point = (Vector3)container.EvaluatePosition(splineIndex, t);
+            Gizmos.DrawWireSphere(point, magnetRadius);
+        }
+
+        // railRadius zusätzlich als engere Referenzlinie zeigen (gelb), damit der
+        // Unterschied zwischen "enge Spur" und tatsächlichem Magnet-Einzugsbereich
+        // im Editor sichtbar bleibt
+        Gizmos.color = new Color(1f, 1f, 0f, 0.4f);
         for (int i = 0; i <= radiusSamples; i++)
         {
             float t = i / (float)radiusSamples;
@@ -218,9 +238,9 @@ public class SplineGrindRail : MonoBehaviour
         }
 
         Gizmos.color = Color.green;
-        Gizmos.DrawWireSphere((Vector3)container.EvaluatePosition(splineIndex, 0f), railRadius * 1.3f);
+        Gizmos.DrawWireSphere((Vector3)container.EvaluatePosition(splineIndex, 0f), magnetRadius * 1.1f);
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere((Vector3)container.EvaluatePosition(splineIndex, 1f), railRadius * 1.3f);
+        Gizmos.DrawWireSphere((Vector3)container.EvaluatePosition(splineIndex, 1f), magnetRadius * 1.1f);
     }
 }
 
