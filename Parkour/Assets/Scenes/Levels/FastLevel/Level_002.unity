@@ -2246,7 +2246,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8486927091067949888, guid: 39a7ea2452ec01f4aaa0f12ac2c72adb, type: 3}
       propertyPath: sceneFolderPath
-      value: Scenes/Levels
+      value: Scenes/Levels/FastLevel
       objectReference: {fileID: 0}
     - target: {fileID: 8486927091067949888, guid: 39a7ea2452ec01f4aaa0f12ac2c72adb, type: 3}
       propertyPath: currentSceneIndex
@@ -2257,8 +2257,32 @@ PrefabInstance:
       value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 8486927091067949888, guid: 39a7ea2452ec01f4aaa0f12ac2c72adb, type: 3}
+      propertyPath: 'sceneList.Array.data[0]'
+      value: Level_001
+      objectReference: {fileID: 0}
+    - target: {fileID: 8486927091067949888, guid: 39a7ea2452ec01f4aaa0f12ac2c72adb, type: 3}
+      propertyPath: 'sceneList.Array.data[1]'
+      value: Level_002
+      objectReference: {fileID: 0}
+    - target: {fileID: 8486927091067949888, guid: 39a7ea2452ec01f4aaa0f12ac2c72adb, type: 3}
       propertyPath: 'sceneList.Array.data[2]'
-      value: Level_3
+      value: Level_003
+      objectReference: {fileID: 0}
+    - target: {fileID: 8635897735959282381, guid: 39a7ea2452ec01f4aaa0f12ac2c72adb, type: 3}
+      propertyPath: goldTime
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 8635897735959282381, guid: 39a7ea2452ec01f4aaa0f12ac2c72adb, type: 3}
+      propertyPath: bronzeTime
+      value: 20
+      objectReference: {fileID: 0}
+    - target: {fileID: 8635897735959282381, guid: 39a7ea2452ec01f4aaa0f12ac2c72adb, type: 3}
+      propertyPath: silverTime
+      value: 15
+      objectReference: {fileID: 0}
+    - target: {fileID: 8635897735959282381, guid: 39a7ea2452ec01f4aaa0f12ac2c72adb, type: 3}
+      propertyPath: diamondTime
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 9171885831822703134, guid: 39a7ea2452ec01f4aaa0f12ac2c72adb, type: 3}
       propertyPath: m_Enabled
