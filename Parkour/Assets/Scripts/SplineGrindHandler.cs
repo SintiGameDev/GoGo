@@ -78,6 +78,15 @@ public class SplineGrindHandler : MonoBehaviour
     private float splineLength;
     private float lastGrindEndTime = -999f;
 
+    // Interpolations-State für flüssige Bewegung: FixedUpdate (fester Tick,
+    // z.B. 50Hz) berechnet nur die ZIEL-Position, transform.position wird aber
+    // in Update() (läuft mit der tatsächlichen Bildschirm-Framerate, z.B. 144Hz)
+    // zwischen der letzten und aktuellen Fixed-Position interpoliert. Ohne das
+    // "springt" die Position nur alle Time.fixedDeltaTime Sekunden, was bei den
+    // hohen Grind-Geschwindigkeiten (20-45 m/s) als sichtbares Ruckeln auffällt.
+    private Vector3 previousFixedPosition;
+    private Vector3 targetFixedPosition;
+
     // Kamera-Pitch wird selbst verwaltet, während canMove im SC_FPSController auf
     // false steht und dessen eigene Look-Logik dadurch ausgeschaltet ist
     private float cameraPitchDuringGrind = 0f;
@@ -133,6 +142,13 @@ public class SplineGrindHandler : MonoBehaviour
         splineLength = spline.CalculateLength(splineIndex);
         if (splineLength < 0.01f) splineLength = 0.01f;
 
+        // Interpolations-Startwerte auf die aktuelle Spieler-Position setzen (NICHT
+        // auf den Spline-Einstiegspunkt) - sonst würde der Spieler im allerersten
+        // Frame nach StartGrind() sichtbar zu seiner Einstiegsposition "snappen",
+        // bevor der erste FixedUpdate-Tick die Interpolation regulär übernimmt.
+        previousFixedPosition = transform.position;
+        targetFixedPosition = transform.position;
+
         isGrinding = true;
         fpsController.canMove = false;       // blockt Bewegung UND Maus-Yaw im SC_FPSController
         characterController.enabled = false; // EINMAL deaktivieren, kein Toggling pro Frame
@@ -165,6 +181,22 @@ public class SplineGrindHandler : MonoBehaviour
         {
             PerformEarlyExit();
         }
+
+        InterpolatePosition();
+    }
+
+    /// <summary>
+    /// Interpoliert transform.position zwischen der vorherigen und aktuellen
+    /// FixedUpdate-Zielposition, basierend darauf, wie weit wir zeitlich zwischen
+    /// zwei Fixed-Ticks stehen. Das verhindert das sichtbare "Springen" der
+    /// Position alle Time.fixedDeltaTime Sekunden, das bei hohem Tempo (20-45 m/s)
+    /// als Ruckeln auffällt - Standard-Fix für Bewegung, die in FixedUpdate
+    /// berechnet, aber smooth dargestellt werden soll.
+    /// </summary>
+    void InterpolatePosition()
+    {
+        float interpolationFactor = Mathf.Clamp01((Time.time - Time.fixedTime) / Time.fixedDeltaTime);
+        transform.position = Vector3.Lerp(previousFixedPosition, targetFixedPosition, interpolationFactor);
     }
 
     void HandleCameraPitchInput()
@@ -180,6 +212,10 @@ public class SplineGrindHandler : MonoBehaviour
     {
         if (!isGrinding) return;
 
+        // Vorherige Zielposition merken, BEVOR currentT weiterläuft - das ist
+        // der Ausgangspunkt für die Interpolation in Update() bis zum nächsten Tick.
+        previousFixedPosition = targetFixedPosition;
+
         // Fortschritt entlang der Bahn mit festem Tick
         float deltaT = (grindSpeed / splineLength) * Time.fixedDeltaTime;
         currentT += forward ? deltaT : -deltaT;
@@ -188,9 +224,9 @@ public class SplineGrindHandler : MonoBehaviour
         float clampedT = Mathf.Clamp01(currentT);
 
         // Position auf der Spline (Weltkoordinaten, +Offset für sichtbares "Aufsitzen")
-        Vector3 targetPos = (Vector3)currentSpline.EvaluatePosition(currentSplineIndex, clampedT);
-        targetPos.y += verticalOffset;
-        transform.position = targetPos;
+        Vector3 newTargetPos = (Vector3)currentSpline.EvaluatePosition(currentSplineIndex, clampedT);
+        newTargetPos.y += verticalOffset;
+        targetFixedPosition = newTargetPos;
 
         // Player-Körper-Yaw zur Tangente drehen (sanft per Slerp, damit Kurven
         // smooth wirken statt hart zu snappen). Pitch/Roll des Körpers bleiben
@@ -263,37 +299,62 @@ public class SplineGrindHandler : MonoBehaviour
     {
         if (!isGrinding) return;
 
-        // Exit-Geschwindigkeit = die tatsächliche Grind-Geschwindigkeit DIESER
-        // Fahrt (nicht mehr der alte Fixwert-Platzhalter) - ein schneller Anlauf
-        // ergibt dadurch auch einen schnelleren Ausstieg am Bahnende.
-        float exitSpeed = grindSpeed;
+        // try/finally: GARANTIERT, dass characterController.enabled wieder auf
+        // true gesetzt wird, selbst wenn im Block darüber etwas schiefgeht (z.B.
+        // ein ungültiger t-Wert bei EvaluateTangent). Vorher konnte eine Exception
+        // hier den Controller dauerhaft deaktiviert lassen, ohne dass EndGrind()
+        // je den unteren Teil der Methode erreicht hat.
+        try
+        {
+            // currentT defensiv klemmen, BEVOR es für EvaluateTangent genutzt wird -
+            // durch den festen FixedUpdate-Tick kann currentT beim Erreichen des
+            // Bahnendes leicht über 1.0 bzw. unter 0.0 liegen (z.B. 1.03), was
+            // außerhalb des für EvaluateTangent gültigen Bereichs [0,1] liegt.
+            float safeT = Mathf.Clamp01(currentT);
 
-        // Exit-Richtung aus der Spline-Tangente am tatsächlichen Endpunkt holen,
-        // nicht aus transform.forward - der Spieler-Yaw folgt der Tangente nur
-        // per Slerp (siehe FixedUpdate) und kann ihr dadurch leicht hinterherhängen,
-        // besonders in engen Kurven kurz vor dem Bahnende.
-        Vector3 tangent = (Vector3)currentSpline.EvaluateTangent(currentSplineIndex, currentT);
-        Vector3 exitDir = forward ? tangent.normalized : -tangent.normalized;
+            // Exit-Geschwindigkeit = die tatsächliche Grind-Geschwindigkeit DIESER
+            // Fahrt (nicht mehr der alte Fixwert-Platzhalter) - ein schneller Anlauf
+            // ergibt dadurch auch einen schnelleren Ausstieg am Bahnende.
+            float exitSpeed = grindSpeed;
 
-        Vector3 exitVelocity = (exitDir * exitSpeed) + (Vector3.up * 2f);
+            // Exit-Richtung aus der Spline-Tangente am tatsächlichen Endpunkt holen,
+            // nicht aus transform.forward - der Spieler-Yaw folgt der Tangente nur
+            // per Slerp (siehe FixedUpdate) und kann ihr dadurch leicht hinterherhängen,
+            // besonders in engen Kurven kurz vor dem Bahnende.
+            Vector3 tangent = (Vector3)currentSpline.EvaluateTangent(currentSplineIndex, safeT);
+            Vector3 exitDir = forward ? tangent.normalized : -tangent.normalized;
 
-        pendingEarlyExitLaunch = true;
-        pendingLaunchVelocity = exitVelocity;
+            Vector3 exitVelocity = (exitDir * exitSpeed) + (Vector3.up * 2f);
 
-        isGrinding = false;
-        lastGrindEndTime = Time.time;
+            pendingEarlyExitLaunch = true;
+            pendingLaunchVelocity = exitVelocity;
 
-        if (characterController != null)
-            characterController.enabled = true;
+            if (showDebugInfo)
+                Debug.Log($"🛤️ Grind beendet (Exit-Speed: {exitSpeed:F1} m/s in Bahnrichtung)");
+        }
+        catch (System.Exception ex)
+        {
+            // Falls hier doch etwas schiefgeht: loggen, aber NICHT crashen lassen,
+            // damit der finally-Block unten garantiert noch läuft.
+            Debug.LogError($"❌ SplineGrindHandler.EndGrind(): Fehler bei Exit-Berechnung, Spieler wird trotzdem freigegeben. Fehler: {ex.Message}");
+        }
+        finally
+        {
+            // Diese Aufräumarbeiten laufen IMMER, auch wenn der try-Block oben
+            // eine Exception geworfen hat - das ist der eigentliche Fix für das
+            // "CharacterController bleibt nach dem Grind deaktiviert"-Problem.
+            isGrinding = false;
+            lastGrindEndTime = Time.time;
 
-        if (fpsController != null)
-            fpsController.canMove = true;
+            if (characterController != null)
+                characterController.enabled = true;
 
-        if (velocityMultiplier != null)
-            velocityMultiplier.OnJumpAction();
+            if (fpsController != null)
+                fpsController.canMove = true;
 
-        if (showDebugInfo)
-            Debug.Log($"🛤️ Grind beendet (Exit-Speed: {exitSpeed:F1} m/s in Bahnrichtung)");
+            if (velocityMultiplier != null)
+                velocityMultiplier.OnJumpAction();
+        }
     }
 
     public bool IsGrinding() => isGrinding;
