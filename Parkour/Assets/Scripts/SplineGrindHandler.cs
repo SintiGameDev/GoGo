@@ -103,9 +103,13 @@ public class SplineGrindHandler : MonoBehaviour
     }
 
     /// <summary>
-    /// Wird von SplineGrindRail aufgerufen, wenn der Spieler ein Trigger-Ende berührt.
+    /// Wird von SplineGrindRail aufgerufen, wenn der Spieler ein Bahn-Segment
+    /// berührt - jetzt an JEDER Stelle der Bahn möglich, nicht nur an den Enden.
+    /// startT ist die genaue Einstiegsposition auf der Spline (0..1), fromStart
+    /// gibt die Richtung an (true = Richtung t=1, false = Richtung t=0), bereits
+    /// aus der Spieler-Bewegungsrichtung von SplineGrindRail bestimmt.
     /// </summary>
-    public void StartGrind(SplineContainer spline, int splineIndex, bool fromStart)
+    public void StartGrind(SplineContainer spline, int splineIndex, bool fromStart, float startT = -1f)
     {
         if (isGrinding) return;
         if (Time.time - lastGrindEndTime < regrindCooldown) return;
@@ -114,7 +118,14 @@ public class SplineGrindHandler : MonoBehaviour
         currentSpline = spline;
         currentSplineIndex = splineIndex;
         forward = fromStart;
-        currentT = fromStart ? 0f : 1f;
+
+        // startT < 0 signalisiert "kein Wert übergeben" (Abwärtskompatibilität zu
+        // altem Aufruf-Stil mit nur 3 Argumenten) - dann auf das jeweilige Bahnende
+        // zurückfallen, wie es das System vorher exklusiv getan hat.
+        if (startT < 0f)
+            currentT = fromStart ? 0f : 1f;
+        else
+            currentT = Mathf.Clamp01(startT);
 
         float entrySpeed = characterController.velocity.magnitude * entrySpeedMultiplier;
         grindSpeed = Mathf.Clamp(entrySpeed, minGrindSpeed, maxGrindSpeed);
@@ -252,21 +263,23 @@ public class SplineGrindHandler : MonoBehaviour
     {
         if (!isGrinding) return;
 
-        // 1. Momentum für den automatischen Ausstieg berechnen
-        // Ersetze 'currentGrindSpeed' durch den exakten Namen deiner Variable 
-        // für die aktuelle Geschwindigkeit auf der Schiene.
-        float exitSpeed = 20f; // Platzhalter für deine aktuelle Grind-Geschwindigkeit
+        // Exit-Geschwindigkeit = die tatsächliche Grind-Geschwindigkeit DIESER
+        // Fahrt (nicht mehr der alte Fixwert-Platzhalter) - ein schneller Anlauf
+        // ergibt dadurch auch einen schnelleren Ausstieg am Bahnende.
+        float exitSpeed = grindSpeed;
 
-        // Wir nutzen transform.forward, da dein Skript den Player-Yaw ohnehin 
-        // an die Spline-Tangente anpasst. Ein leichter Up-Vektor verhindert 
-        // das sofortige Absinken.
-        Vector3 exitVelocity = (transform.forward * exitSpeed) + (Vector3.up * 2f);
+        // Exit-Richtung aus der Spline-Tangente am tatsächlichen Endpunkt holen,
+        // nicht aus transform.forward - der Spieler-Yaw folgt der Tangente nur
+        // per Slerp (siehe FixedUpdate) und kann ihr dadurch leicht hinterherhängen,
+        // besonders in engen Kurven kurz vor dem Bahnende.
+        Vector3 tangent = (Vector3)currentSpline.EvaluateTangent(currentSplineIndex, currentT);
+        Vector3 exitDir = forward ? tangent.normalized : -tangent.normalized;
 
-        // 2. Deine bewährte LateUpdate Logik triggern
+        Vector3 exitVelocity = (exitDir * exitSpeed) + (Vector3.up * 2f);
+
         pendingEarlyExitLaunch = true;
         pendingLaunchVelocity = exitVelocity;
 
-        // 3. Bestehende Cleanup Logik
         isGrinding = false;
         lastGrindEndTime = Time.time;
 
@@ -280,7 +293,7 @@ public class SplineGrindHandler : MonoBehaviour
             velocityMultiplier.OnJumpAction();
 
         if (showDebugInfo)
-            Debug.Log("🛤️ Grind beendet (mit Momentum in Blickrichtung)");
+            Debug.Log($"🛤️ Grind beendet (Exit-Speed: {exitSpeed:F1} m/s in Bahnrichtung)");
     }
 
     public bool IsGrinding() => isGrinding;

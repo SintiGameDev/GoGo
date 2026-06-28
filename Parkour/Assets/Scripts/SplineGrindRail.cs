@@ -4,11 +4,20 @@ using UnityEngine.Splines;
 
 /// <summary>
 /// Kommt auf ein GameObject mit einem SplineContainer (Unity Splines-Paket,
-/// com.unity.splines). Erzeugt automatisch zwei Trigger-Collider an Anfang und
-/// Ende des Splines. Berührt der Spieler einen davon, wird der SplineGrindHandler
-/// am Spieler benachrichtigt, in welche Richtung gegrinded werden soll:
-///   - Trigger am Anfang berührt  -> grind vorwärts (t: 0 -> 1)
-///   - Trigger am Ende berührt    -> grind rückwärts (t: 1 -> 0)
+/// com.unity.splines). Erzeugt automatisch eine Kette von Kapsel-Collidern
+/// entlang der GESAMTEN Bahn (nicht mehr nur an den beiden Enden) - der Spieler
+/// kann dadurch an jeder beliebigen Stelle einsteigen, nicht nur an Start/Ende.
+///
+/// Performance-Überlegung: Eine Trigger-Kette aus Collidern, die nur bei
+/// tatsächlicher Kollision per OnTriggerEnter feuert, ist günstiger als eine
+/// ständige Distanzprüfung in Update() - Unitys Physik-Engine übernimmt das
+/// Culling (Broadphase) bereits effizient, eine eigene Pro-Frame-Distanzprüfung
+/// wäre hier tatsächlich die teurere Variante.
+///
+/// Einstiegsrichtung: Beim Eintreten wird die BEWEGUNGSRICHTUNG des Spielers
+/// (CharacterController.velocity) mit der Spline-Tangente an der nächstgelegenen
+/// Stelle verglichen (Skalarprodukt) - läuft er eher Richtung Bahnende oder
+/// Richtung Bahnanfang, das bestimmt die Grind-Richtung.
 ///
 /// Voraussetzung: Das Unity-Splines-Paket muss über den Package Manager
 /// installiert sein (Window > Package Manager > "Splines").
@@ -20,14 +29,17 @@ public class SplineGrindRail : MonoBehaviour
     [Tooltip("Index des Splines im Container (meist 0, falls nur ein Spline vorhanden)")]
     public int splineIndex = 0;
 
-    [Header("Trigger-Enden")]
+    [Header("Trigger-Kette entlang der Bahn")]
     [Tooltip("Tag des Spielers, der die Bahn auslösen darf")]
     public string playerTag = "Player";
 
-    [Tooltip("Radius der automatisch erzeugten Trigger-Kugeln an Anfang/Ende")]
-    public float triggerRadius = 1.0f;
+    [Tooltip("Radius der Kapsel-Collider entlang der Bahn (= wie nah der Spieler an die Schiene muss)")]
+    public float railRadius = 0.6f;
 
-    [Tooltip("Trigger-Collider automatisch erzeugen (empfohlen). Wenn aus, müssen sie manuell als Child mit SplineGrindEndTrigger zugewiesen werden.")]
+    [Tooltip("Anzahl der Segmente, in die die Bahn für die Trigger-Kette unterteilt wird. Höher = genauere Anschmiegung an Kurven, aber mehr Collider-Objekte.")]
+    public int segmentCount = 20;
+
+    [Tooltip("Trigger-Collider automatisch erzeugen (empfohlen)")]
     public bool autoCreateTriggers = true;
 
     [Header("Debug")]
@@ -43,41 +55,69 @@ public class SplineGrindRail : MonoBehaviour
 
         if (autoCreateTriggers)
         {
-            CreateEndTriggers();
+            CreateSegmentTriggers();
         }
     }
 
-    void CreateEndTriggers()
+    /// <summary>
+    /// Erzeugt eine Kette von Kapsel-Collidern entlang der Bahn. Jedes Segment
+    /// kennt sein eigenes t-Intervall [tStart, tEnd], damit beim Einstieg sofort
+    /// klar ist, an welcher ungefähren Stelle der Bahn der Spieler steht.
+    /// </summary>
+    void CreateSegmentTriggers()
     {
-        Vector3 startPos = GetWorldPosition(0f);
-        Vector3 endPos = GetWorldPosition(1f);
+        for (int i = 0; i < segmentCount; i++)
+        {
+            float tStart = i / (float)segmentCount;
+            float tEnd = (i + 1) / (float)segmentCount;
+            float tMid = (tStart + tEnd) * 0.5f;
 
-        CreateTrigger("GrindTrigger_Start", startPos, true);
-        CreateTrigger("GrindTrigger_End", endPos, false);
+            Vector3 posStart = (Vector3)splineContainer.EvaluatePosition(splineIndex, tStart);
+            Vector3 posEnd = (Vector3)splineContainer.EvaluatePosition(splineIndex, tEnd);
+
+            CreateSegmentCollider($"GrindSegment_{i}", posStart, posEnd, tStart, tEnd, tMid);
+        }
 
         if (showDebugInfo)
-            Debug.Log($"✅ SplineGrindRail: Trigger erzeugt an Start {startPos} und Ende {endPos}");
+            Debug.Log($"✅ SplineGrindRail: {segmentCount} Trigger-Segmente entlang der Bahn erzeugt");
     }
 
-    void CreateTrigger(string name, Vector3 worldPos, bool isStart)
+    void CreateSegmentCollider(string name, Vector3 posA, Vector3 posB, float tStart, float tEnd, float tMid)
     {
-        GameObject triggerObj = new GameObject(name);
-        triggerObj.transform.SetParent(transform);
-        triggerObj.transform.position = worldPos;
+        GameObject segObj = new GameObject(name);
+        segObj.transform.SetParent(transform);
 
-        SphereCollider col = triggerObj.AddComponent<SphereCollider>();
+        Vector3 midPoint = (posA + posB) * 0.5f;
+        segObj.transform.position = midPoint;
+
+        Vector3 direction = posB - posA;
+        float segmentLength = direction.magnitude;
+
+        // CapsuleCollider richtet seine Achse standardmäßig entlang der lokalen
+        // Y-Achse aus - das Objekt rotieren, damit diese Achse mit der
+        // Bahnrichtung dieses Segments übereinstimmt.
+        if (direction.sqrMagnitude > 0.0001f)
+        {
+            segObj.transform.rotation = Quaternion.FromToRotation(Vector3.up, direction.normalized);
+        }
+
+        CapsuleCollider col = segObj.AddComponent<CapsuleCollider>();
         col.isTrigger = true;
-        col.radius = triggerRadius;
+        col.radius = railRadius;
+        col.direction = 1; // Y-Achse (lokal)
+        col.height = Mathf.Max(segmentLength, railRadius * 2f);
 
-        SplineGrindEndTrigger endTrigger = triggerObj.AddComponent<SplineGrindEndTrigger>();
-        endTrigger.Initialize(this, isStart, playerTag);
+        SplineGrindSegmentTrigger segTrigger = segObj.AddComponent<SplineGrindSegmentTrigger>();
+        segTrigger.Initialize(this, tStart, tEnd, tMid, playerTag);
     }
 
     /// <summary>
-    /// Wird von den End-Triggern aufgerufen, wenn der Spieler eintritt.
-    /// Leitet an den SplineGrindHandler des Spielers weiter.
+    /// Wird von einem Segment-Trigger aufgerufen, wenn der Spieler eintritt.
+    /// Bestimmt die Einstiegsrichtung aus der Bewegungsrichtung des Spielers
+    /// (Skalarprodukt mit der Spline-Tangente an der Eintrittsstelle) und
+    /// leitet an den SplineGrindHandler weiter.
     /// </summary>
-    public void OnPlayerEnteredEnd(GameObject player, bool fromStart)
+    public void OnPlayerEnteredSegment(GameObject player, float tStart, float tEnd, float tMid)
     {
         SplineGrindHandler handler = player.GetComponentInParent<SplineGrindHandler>();
 
@@ -88,17 +128,62 @@ public class SplineGrindRail : MonoBehaviour
             return;
         }
 
-        handler.StartGrind(splineContainer, splineIndex, fromStart);
+        // Genauesten Einstiegspunkt auf der Bahn innerhalb dieses Segments finden
+        // (grob über ein paar Sub-Samples, da SplineUtility.GetNearestPoint pro
+        // Aufruf etwas teurer ist und wir nur innerhalb eines kurzen Segments suchen)
+        float nearestT = FindNearestTOnSegment(player.transform.position, tStart, tEnd);
+
+        // Bewegungsrichtung des Spielers ermitteln
+        CharacterController cc = player.GetComponentInParent<CharacterController>();
+        Vector3 playerVelocity = cc != null ? cc.velocity : Vector3.zero;
+
+        bool movingForward = DetermineDirectionFromVelocity(playerVelocity, nearestT);
+
+        handler.StartGrind(splineContainer, splineIndex, movingForward, nearestT);
 
         if (showDebugInfo)
-            Debug.Log($"🛤️ SplineGrindRail: Grind gestartet ({(fromStart ? "vorwärts" : "rückwärts")})");
+            Debug.Log($"🛤️ SplineGrindRail: Einstieg bei t={nearestT:F2} ({(movingForward ? "vorwärts" : "rückwärts")}), Spieler-Speed: {playerVelocity.magnitude:F1} m/s");
     }
 
-    /// <summary>Weltposition auf dem Spline bei Interpolation t (0..1).</summary>
-    public Vector3 GetWorldPosition(float t)
+    /// <summary>
+    /// Tastet das Segment grob ab, um den nächstgelegenen Punkt auf der Spline
+    /// zur Spieler-Position zu finden (genauer als die Segment-Mitte zu nehmen).
+    /// </summary>
+    float FindNearestTOnSegment(Vector3 playerPos, float tStart, float tEnd, int subSamples = 8)
     {
-        // EvaluatePosition des Containers liefert bereits Weltkoordinaten
-        return (Vector3)splineContainer.EvaluatePosition(splineIndex, t);
+        float bestT = tStart;
+        float bestDist = float.MaxValue;
+
+        for (int i = 0; i <= subSamples; i++)
+        {
+            float t = Mathf.Lerp(tStart, tEnd, i / (float)subSamples);
+            Vector3 pos = (Vector3)splineContainer.EvaluatePosition(splineIndex, t);
+            float dist = (pos - playerPos).sqrMagnitude;
+
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                bestT = t;
+            }
+        }
+
+        return bestT;
+    }
+
+    /// <summary>
+    /// Vergleicht die Spieler-Bewegungsrichtung mit der Spline-Tangente an der
+    /// Eintrittsstelle per Skalarprodukt. Positiv -> Spieler bewegt sich in
+    /// Tangentenrichtung (Richtung t=1, "vorwärts"). Negativ -> Gegenrichtung.
+    /// </summary>
+    bool DetermineDirectionFromVelocity(Vector3 playerVelocity, float t)
+    {
+        if (playerVelocity.sqrMagnitude < 0.01f)
+            return true; // Spieler steht praktisch still - Default: vorwärts
+
+        Vector3 tangent = (Vector3)splineContainer.EvaluateTangent(splineIndex, t);
+        float dot = Vector3.Dot(playerVelocity.normalized, tangent.normalized);
+
+        return dot >= 0f;
     }
 
     void OnDrawGizmos()
@@ -112,7 +197,6 @@ public class SplineGrindRail : MonoBehaviour
 
         Gizmos.color = gizmoColor;
 
-        // Spline grob als Linien-Sampling zeichnen
         int samples = 32;
         Vector3 prev = (Vector3)container.EvaluatePosition(splineIndex, 0f);
         for (int i = 1; i <= samples; i++)
@@ -123,29 +207,41 @@ public class SplineGrindRail : MonoBehaviour
             prev = point;
         }
 
-        // Enden markieren
+        // Trigger-Radius entlang der Bahn als halbtransparente Indikation zeigen
+        Gizmos.color = new Color(gizmoColor.r, gizmoColor.g, gizmoColor.b, 0.25f);
+        int radiusSamples = 12;
+        for (int i = 0; i <= radiusSamples; i++)
+        {
+            float t = i / (float)radiusSamples;
+            Vector3 point = (Vector3)container.EvaluatePosition(splineIndex, t);
+            Gizmos.DrawWireSphere(point, railRadius);
+        }
+
         Gizmos.color = Color.green;
-        Gizmos.DrawWireSphere((Vector3)container.EvaluatePosition(splineIndex, 0f), triggerRadius);
+        Gizmos.DrawWireSphere((Vector3)container.EvaluatePosition(splineIndex, 0f), railRadius * 1.3f);
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere((Vector3)container.EvaluatePosition(splineIndex, 1f), triggerRadius);
+        Gizmos.DrawWireSphere((Vector3)container.EvaluatePosition(splineIndex, 1f), railRadius * 1.3f);
     }
 }
 
 /// <summary>
-/// Wird automatisch auf die End-Trigger-Objekte gesetzt. Reicht OnTriggerEnter
-/// an die SplineGrindRail weiter, zusammen mit der Info, ob es das Start- oder
-/// Endende ist (= Grind-Richtung).
+/// Wird automatisch auf jedes Bahn-Segment gesetzt. Reicht OnTriggerEnter an
+/// die SplineGrindRail weiter, zusammen mit dem t-Intervall dieses Segments.
 /// </summary>
-public class SplineGrindEndTrigger : MonoBehaviour
+public class SplineGrindSegmentTrigger : MonoBehaviour
 {
     private SplineGrindRail rail;
-    private bool isStart;
+    private float tStart;
+    private float tEnd;
+    private float tMid;
     private string playerTag;
 
-    public void Initialize(SplineGrindRail parentRail, bool isStartEnd, string tag)
+    public void Initialize(SplineGrindRail parentRail, float segmentTStart, float segmentTEnd, float segmentTMid, string tag)
     {
         rail = parentRail;
-        isStart = isStartEnd;
+        tStart = segmentTStart;
+        tEnd = segmentTEnd;
+        tMid = segmentTMid;
         playerTag = tag;
     }
 
@@ -154,10 +250,9 @@ public class SplineGrindEndTrigger : MonoBehaviour
         if (rail == null)
             return;
 
-        // Spieler direkt oder über Parent-Hierarchie erkennen (für Child-Collider)
         if (IsPlayer(other.gameObject))
         {
-            rail.OnPlayerEnteredEnd(other.gameObject, isStart);
+            rail.OnPlayerEnteredSegment(other.gameObject, tStart, tEnd, tMid);
         }
     }
 
