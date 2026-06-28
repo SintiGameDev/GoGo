@@ -368,8 +368,8 @@ public class SurfContactParticles : MonoBehaviour
 
         float yOffset = 400f;
 
-        GUI.color = Color.yellow;
-        GUI.Label(new Rect(10, yOffset, 400, 20), "=== SURF CONTACT PARTICLES ===");
+       // GUI.color = Color.yellow;
+        //GUI.Label(new Rect(10, yOffset, 400, 20), "=== SURF CONTACT PARTICLES ===");
         yOffset += 20f;
 
         GUI.color = Color.white;
@@ -379,23 +379,23 @@ public class SurfContactParticles : MonoBehaviour
             bool isSurfing = surfController.IsSurfing();
             float surfSpeed = surfController.GetCurrentSurfSpeed();
 
-            GUI.Label(new Rect(10, yOffset, 400, 20),
-                $"Surfing: {(isSurfing ? "YES" : "NO")} | Speed: {surfSpeed:F1} m/s");
+            //GUI.Label(new Rect(10, yOffset, 400, 20),
+            // $"Surfing: {(isSurfing ? "YES" : "NO")} | Speed: {surfSpeed:F1} m/s");
             yOffset += 20f;
 
-            GUI.Label(new Rect(10, yOffset, 400, 20),
-                $"Wall Contact: {(hasContact ? "YES" : "NO")}");
+            // GUI.Label(new Rect(10, yOffset, 400, 20),
+            //$"Wall Contact: {(hasContact ? "YES" : "NO")}");
             yOffset += 20f;
 
             if (hasContact)
             {
-                GUI.color = Color.green;
-                GUI.Label(new Rect(10, yOffset, 400, 20),
-                    $"Emission Rate: {emissionModule.rateOverTime.constant:F0}/s");
+                //GUI.color = Color.green;
+                //GUI.Label(new Rect(10, yOffset, 400, 20),
+                //$"Emission Rate: {emissionModule.rateOverTime.constant:F0}/s");
                 yOffset += 20f;
 
-                GUI.Label(new Rect(10, yOffset, 400, 20),
-                    $"Contact Position: {currentContactPoint}");
+                //GUI.Label(new Rect(10, yOffset, 400, 20),
+                //$"Contact Position: {currentContactPoint}");
                 yOffset += 20f;
             }
 

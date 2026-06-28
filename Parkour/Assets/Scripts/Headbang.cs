@@ -21,6 +21,9 @@ public class HeadBang : MonoBehaviour
     public float minFallVelocityForImpact = 5f; // Minimale Fallgeschwindigkeit für Impact
     public float maxFallVelocityForMaxImpact = 20f; // Fallgeschwindigkeit für maximalen Impact
 
+    [Header("Debug")]
+    public bool showDebugInfo = false;
+
     private SC_FPSController fpsController;
     private Vector3 originalCameraLocalPosition;
     private bool wasInAir = false;
@@ -160,6 +163,9 @@ public class HeadBang : MonoBehaviour
     // Debug Visualisierung
     void OnGUI()
     {
+        if (!showDebugInfo)
+            return;
+
         if (currentTween != null)
         {
             GUI.Label(new Rect(10, 120, 300, 20), "Head Bang Active!");

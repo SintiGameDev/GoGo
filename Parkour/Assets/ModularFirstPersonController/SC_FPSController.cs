@@ -66,6 +66,10 @@ public class SC_FPSController : MonoBehaviour
     [Tooltip("Maximale Gesamtgeschwindigkeit (x/y/z kombiniert), auf die moveDirection vor jedem Move gecapt wird")]
     public float maxTotalVelocity = 30f;
 
+    [Header("Debug")]
+    [Tooltip("Zeigt das OnGUI-Debug-Overlay (Wall Grab Timer, Grappling-Status, Total Velocity) - bei Bedarf ausschalten, um die Anzeige zu verstecken, ohne den Code zu entfernen")]
+    public bool showDebugInfo = false;
+
     CharacterController characterController;
     Rigidbody rb;
     Vector3 moveDirection = Vector3.zero;
@@ -445,6 +449,9 @@ public class SC_FPSController : MonoBehaviour
 
     void OnGUI()
     {
+        if (!showDebugInfo)
+            return;
+
         if (isWallGrabbing)
         {
             GUI.Label(new Rect(10, 10, 300, 20), $"Wall Grab Time: {wallGrabTimer:F2}s");

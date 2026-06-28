@@ -17,6 +17,9 @@ public class TimerHUDController : MonoBehaviour
     [Tooltip("Referenz zum TimerController (auto-detected wenn leer)")]
     public TimerController timerController;
 
+    [Tooltip("Referenz zum ResultScreenController, um die Tasten-Hinweise (Neustart/Nächstes Level) synchron zu dessen tatsächlich konfigurierten Tasten zu halten (auto-detected wenn leer)")]
+    public ResultScreenController resultScreenController;
+
     [Header("Result-Overlay")]
     public bool showResultOverlay = true;
 
@@ -42,6 +45,12 @@ public class TimerHUDController : MonoBehaviour
     private Label resultMedalNameLabel;
     private Label resultBestTimeLabel;
 
+    // Tasten-Hinweis-Elemente (Neustart / Nächstes Level) - Text wird aus den
+    // tatsächlichen KeyCodes von ResultScreenController abgeleitet, statt einen
+    // zweiten, redundanten Tastennamen-String im UXML/Code zu pflegen.
+    private Label hintRestartKeyLabel;
+    private Label hintNextKeyLabel;
+
     // Cache, um das Zeit-Label nur zu aktualisieren wenn sich der angezeigte
     // Text tatsächlich ändert (vermeidet unnötige Re-Layout-Passes pro Frame)
     private string lastDisplayedTime = "";
@@ -53,6 +62,9 @@ public class TimerHUDController : MonoBehaviour
 
         if (timerController == null)
             timerController = FindObjectOfType<TimerController>();
+
+        if (resultScreenController == null)
+            resultScreenController = FindObjectOfType<ResultScreenController>();
 
         if (timerController == null && showDebugInfo)
         {
@@ -77,6 +89,9 @@ public class TimerHUDController : MonoBehaviour
         resultTimeLabel = root.Q<Label>("result-time-label");
         resultMedalNameLabel = root.Q<Label>("result-medal-name-label");
         resultBestTimeLabel = root.Q<Label>("result-best-time-label");
+
+        hintRestartKeyLabel = root.Q<Label>("hint-restart-key-label");
+        hintNextKeyLabel = root.Q<Label>("hint-next-key-label");
 
         if (showDebugInfo)
         {
@@ -116,6 +131,8 @@ public class TimerHUDController : MonoBehaviour
         if (resultOverlay != null)
             resultOverlay.RemoveFromClassList("result-overlay--visible");
 
+        ApplyKeyHintLabels();
+
         if (timerController == null)
             return;
 
@@ -125,6 +142,50 @@ public class TimerHUDController : MonoBehaviour
             timerController.GetTimeForRank(timerController.GetNextTargetRank()),
             timerController.GetElapsedTime() <= timerController.GetTimeForRank(timerController.GetNextTargetRank())
         );
+    }
+
+    /// <summary>
+    /// Setzt die Tasten-Hinweis-Labels ("R", "LEERTASTE") aus den tatsächlich
+    /// konfigurierten KeyCodes von ResultScreenController, statt einen zweiten,
+    /// unabhängigen Text im UXML zu pflegen, der mit der Zeit auseinanderlaufen
+    /// könnte (z.B. wenn restartKey/nextLevelKey im Inspector geändert werden).
+    /// Wird einmalig in Start() aufgerufen - die Tasten ändern sich nicht zur
+    /// Laufzeit, ein Pro-Frame-Update wäre hier unnötig.
+    /// </summary>
+    void ApplyKeyHintLabels()
+    {
+        if (resultScreenController == null)
+        {
+            if (showDebugInfo)
+                Debug.LogWarning("⚠️ TimerHUDController: Kein ResultScreenController gefunden - Tasten-Hinweise bleiben auf UXML-Default-Text.");
+            return;
+        }
+
+        if (hintRestartKeyLabel != null)
+            hintRestartKeyLabel.text = FormatKeyName(resultScreenController.restartKey);
+
+        if (hintNextKeyLabel != null)
+            hintNextKeyLabel.text = FormatKeyName(resultScreenController.nextLevelKey);
+    }
+
+    /// <summary>
+    /// Übersetzt einen KeyCode in einen kurzen, lesbaren Anzeige-Text. Einzelne
+    /// Buchstaben/Ziffern bleiben wie sie sind (z.B. "R"), bekannte Sondertasten
+    /// bekommen einen passenderen deutschen Anzeigenamen als der rohe Enum-Name.
+    /// </summary>
+    string FormatKeyName(KeyCode key)
+    {
+        switch (key)
+        {
+            case KeyCode.Space: return "LEERTASTE";
+            case KeyCode.Return: return "ENTER";
+            case KeyCode.Escape: return "ESC";
+            case KeyCode.LeftShift:
+            case KeyCode.RightShift: return "SHIFT";
+            case KeyCode.LeftControl:
+            case KeyCode.RightControl: return "STRG";
+            default: return key.ToString().ToUpperInvariant();
+        }
     }
 
     // ---------------- Live-Updates (läuft jeden Frame, aber sehr leichtgewichtig) ----------------

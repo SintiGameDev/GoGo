@@ -261,14 +261,16 @@ public class GoalTrigger : MonoBehaviour
         // Effekte abspielen
         PlayEffects();
 
-        // Slow Motion oder direkter Scene-Wechsel
+        // Goal sofort optisch verstecken (Renderer/Collider aus) - vorher passierte
+        // das erst beim Scene-Wechsel, jetzt sofort, da der Spieler ggf. länger
+        // im Level verweilt, bevor er per Leertaste weitergeht
+        HideGoal();
+
+        // Slow Motion optisch abspielen (lädt selbst KEINE Szene mehr -
+        // das übernimmt ResultScreenController auf Leertaste/R Tastendruck)
         if (useSlowMotion)
         {
             StartCoroutine(SlowMotionSequence());
-        }
-        else
-        {
-            LoadNextScene();
         }
     }
 
@@ -320,26 +322,20 @@ public class GoalTrigger : MonoBehaviour
         // Warte in Real-Time
         yield return new WaitForSecondsRealtime(slowMotionDuration);
 
-        // Time Scale zurücksetzen
-        Time.timeScale = 1f;
-        Time.fixedDeltaTime = 0.02f;
-
-        LoadNextScene();
+        // Time Scale NICHT zurücksetzen und KEINE Scene mehr automatisch laden -
+        // das übernimmt jetzt ausschließlich ResultScreenController auf Leertaste/R,
+        // damit der Spieler genug Zeit hat, das Ergebnis-UI zu sehen. Time.timeScale
+        // bleibt bewusst in der Slow-Motion, bis der Spieler aktiv weitergeht (fühlt
+        // sich wie ein "eingefrorener" Ergebnis-Moment an statt normal weiterzulaufen).
     }
 
-    void LoadNextScene()
+    /// <summary>
+    /// Versteckt das Goal-Objekt optisch (Renderer/Collider aus), OHNE eine neue
+    /// Szene zu laden - das übernimmt jetzt ausschließlich ResultScreenController,
+    /// der über TimerController.OnTimerStopped auf Leertaste/R wartet.
+    /// </summary>
+    void HideGoal()
     {
-        // Scene Director benachrichtigen
-        if (sceneDirector != null)
-        {
-            sceneDirector.LoadNextScene();
-        }
-        else
-        {
-            Debug.LogError("❌ Kein SceneDirector gefunden! Kann Scene nicht laden.");
-        }
-
-        // Optional: Goal ausblenden statt zerstören (falls Grabbable-Script Probleme macht)
         if (showDebugInfo)
             Debug.Log($"👻 Goal wird unsichtbar: {gameObject.name}");
 
@@ -356,9 +352,6 @@ public class GoalTrigger : MonoBehaviour
         {
             c.enabled = false;
         }
-
-        // Optional: Objekt komplett deaktivieren
-        // gameObject.SetActive(false);
     }
 
     // Manueller Test (Drücke 'G' im Play Mode)

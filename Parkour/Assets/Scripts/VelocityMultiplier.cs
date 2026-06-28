@@ -24,6 +24,9 @@ public class VelocityMultiplier : MonoBehaviour
     [Tooltip("Wie schnell der Multiplier nach Ablauf der Hold-Zeit auf 1.0 zurueckfaellt (pro Sekunde)")]
     public float decayRate = 2.0f;
 
+    [Header("Debug")]
+    public bool showDebugInfo = false;
+
     private SC_FPSController fpsController;
     private CharacterController characterController;
 
@@ -141,6 +144,9 @@ public class VelocityMultiplier : MonoBehaviour
 
     void OnGUI()
     {
+        if (!showDebugInfo)
+            return;
+
         if (currentSpeedMultiplier > 1.0f)
         {
             GUI.Label(new Rect(10, 40, 500, 20), $"Jump Combo: {currentSpeedMultiplier:F2}x");
