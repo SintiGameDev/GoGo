@@ -65,8 +65,8 @@ CharacterController:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Height: 2
-  m_Radius: 0.5
+  m_Height: 3
+  m_Radius: 1
   m_SlopeLimit: 45
   m_StepOffset: 0.3
   m_SkinWidth: 0.08
@@ -216,6 +216,7 @@ MonoBehaviour:
   destroyEffect: {fileID: 0}
   grappleSound: {fileID: 0}
   destroySound: {fileID: 8300000, guid: 17727032be7e3c149b5d4c8ece783f79, type: 3}
+  showDebugInfo: 0
 --- !u!114 &6125933404379417880
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -228,19 +229,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1fd1baa6c1294c2468ff5068aa489325, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  walkingSpeed: 20
-  runningSpeed: 30
+  walkingSpeed: 16
+  runningSpeed: 27
   jumpSpeed: 30
-  wallJumpSpeed: 20
+  wallJumpSpeed: 30
   gravity: 50
-  riseGravityMultiplier: 1
-  fallGravityMultiplier: 1.8
-  lowJumpGravityMultiplier: 2.5
+  maxLeanAngle: 2
+  leanSpeed: 12
+  riseGravityMultiplier: 1.1
+  fallGravityMultiplier: 2
+  lowJumpGravityMultiplier: 3
   coyoteTime: 0.12
   jumpBufferTime: 0.12
   airControlFactor: 0.7
-  groundAcceleration: 35
-  airAcceleration: 15
+  airAcceleration: 400
   wallJumpMomentumRetain: 0.95
   apexThreshold: 1.5
   apexGravityMultiplier: 0.5
@@ -254,11 +256,13 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   colliderObject: {fileID: 4538536580974083876}
+  wallGrabExitInputThreshold: 0.3
+  wallGrabReentryCooldown: 0.25
   baseFOV: 80
   maxFOV: 90
   fovChangeDuration: 0.2
   fovSpeedThreshold: 15
-  speedTransitionRate: 30
+  speedTransitionRate: 50
   maxTotalVelocity: 65
   canMove: 1
 --- !u!114 &3999707696816788914
@@ -282,6 +286,7 @@ MonoBehaviour:
   wallGrabEaseType: 2
   minFallVelocityForImpact: 15
   maxFallVelocityForMaxImpact: 25
+  showDebugInfo: 0
 --- !u!114 &6049805492977812032
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -353,6 +358,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   dragCoefficient: 0.02
   useAsymptoticSpeedCap: 1
+  showDebugInfo: 0
 --- !u!114 &2584267313266014871
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -389,6 +395,7 @@ MonoBehaviour:
   maxComboMultiplier: 3
   boostHoldDuration: 1
   decayRate: 0.5
+  showDebugInfo: 0
 --- !u!114 &2521946580280787812
 MonoBehaviour:
   m_ObjectHideFlags: 0

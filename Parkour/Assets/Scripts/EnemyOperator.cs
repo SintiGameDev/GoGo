@@ -413,12 +413,25 @@ public class EnemyOperator : MonoBehaviour
         }
 
         grappleTarget = targetEnemy.transform.position;
-        Vector3 direction = (grappleTarget - transform.position).normalized;
-        float distance = Vector3.Distance(transform.position, grappleTarget);
+        Vector3 toTarget = grappleTarget - transform.position;
+        float distance = toTarget.magnitude;
+        Vector3 direction = distance > 0.0001f ? toTarget / distance : Vector3.zero;
 
         if (characterController != null)
         {
-            characterController.Move(direction * grappleSpeed * Time.deltaTime);
+            // Geplante Bewegung für diesen Frame
+            float step = grappleSpeed * Time.deltaTime;
+
+            // Wie weit dürfen wir uns dem Enemy noch nähern, bevor wir killRadius erreichen?
+            float maxAllowedStep = Mathf.Max(0f, distance - killRadius);
+
+            // Bewegung clampen -> Spieler bleibt immer auf/außerhalb killRadius, kein Eindringen ins Mesh
+            float clampedStep = Mathf.Min(step, maxAllowedStep);
+
+            if (clampedStep > 0f)
+            {
+                characterController.Move(direction * clampedStep);
+            }
         }
 
         if (distance <= killRadius)

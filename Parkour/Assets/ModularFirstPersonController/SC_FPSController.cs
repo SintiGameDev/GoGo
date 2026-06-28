@@ -11,7 +11,11 @@ public class SC_FPSController : MonoBehaviour
     public float wallJumpSpeed = 10.0f;
     public float gravity = 30.0f;
 
-    [Header("Jump Feel (Rise/Fall Gravity)")]
+    [Header("Camera Lean (Strafe Tilt)")]
+    [Tooltip("Maximaler Roll-Winkel (Z-Achse) der Kamera bei vollem seitlichen Input")]
+    public float maxLeanAngle = 4f;
+    [Tooltip("Wie schnell die Kamera in den Lean-Winkel hinein/heraus lerpt")]
+    public float leanSpeed = 8f;
     [Tooltip("Multiplier auf 'gravity' waehrend der Spieler nach oben fliegt (steigt)")]
     public float riseGravityMultiplier = 1.0f;
     [Tooltip("Multiplier auf 'gravity' waehrend der Spieler faellt -> hoeher = snappier, weniger floaty")]
@@ -54,6 +58,11 @@ public class SC_FPSController : MonoBehaviour
     public float wallGrabMass = 0.1f;
     public LayerMask wallLayer;
     public GameObject colliderObject;
+    [Tooltip("Wie stark der Input von der Wand weg zeigen muss (Dot-Product mit wallNormal), um den Grab aktiv zu verlassen")]
+    [Range(0f, 1f)]
+    public float wallGrabExitInputThreshold = 0.3f;
+    [Tooltip("Sekunden nach aktivem Wall-Grab-Exit, in denen kein erneutes Einschnappen an derselben Wand moeglich ist")]
+    public float wallGrabReentryCooldown = 0.25f;
 
     // FOV-EINSTELLUNGEN
     public float baseFOV = 60f;
@@ -63,17 +72,16 @@ public class SC_FPSController : MonoBehaviour
 
     [Header("Speed Settings")]
     public float speedTransitionRate = 10f;
-    [Tooltip("Maximale Gesamtgeschwindigkeit (x/y/z kombiniert), auf die moveDirection vor jedem Move gecapt wird")]
-    public float maxTotalVelocity = 30f;
-
-    [Header("Debug")]
-    [Tooltip("Zeigt das OnGUI-Debug-Overlay (Wall Grab Timer, Grappling-Status, Total Velocity) - bei Bedarf ausschalten, um die Anzeige zu verstecken, ohne den Code zu entfernen")]
-    public bool showDebugInfo = false;
+    [Tooltip("Maximale Gesamtgeschwindigkeit (x/y/z kombiniert), auf die moveDirection vor jedem Move gecapt wird. " +
+             "Sollte klar ueber (runningSpeed * VelocityMultiplier.maxComboMultiplier) liegen, sonst killt der Cap " +
+             "den Sinn des Combo-Systems. Dient nur als Sicherheitsnetz gegen Physik-Edge-Cases, nicht als Gameplay-Limit.")]
+    public float maxTotalVelocity = 60f;
 
     CharacterController characterController;
     Rigidbody rb;
     Vector3 moveDirection = Vector3.zero;
     float rotationX = 0;
+    float currentLeanAngle = 0f;
 
     [HideInInspector]
     public bool canMove = true;
@@ -82,6 +90,7 @@ public class SC_FPSController : MonoBehaviour
     private bool isWallGrabbing = false;
     private float wallGrabTimer = 0f;
     private Vector3 wallNormal;
+    private float wallGrabReentryBlockedUntil = -999f;
     private WallGrabTrigger wallGrabTrigger;
     private VelocityMultiplier velocityMultiplier;
     private HeadBang headBang;
@@ -120,6 +129,12 @@ public class SC_FPSController : MonoBehaviour
         wallJumpMomentumRetain = Mathf.Clamp01(wallJumpMomentumRetain);
         apexThreshold = Mathf.Max(0f, apexThreshold);
         apexGravityMultiplier = Mathf.Max(0f, apexGravityMultiplier);
+
+        maxLeanAngle = Mathf.Max(0f, maxLeanAngle);
+        leanSpeed = Mathf.Max(0.01f, leanSpeed);
+
+        wallGrabExitInputThreshold = Mathf.Clamp01(wallGrabExitInputThreshold);
+        wallGrabReentryCooldown = Mathf.Max(0f, wallGrabReentryCooldown);
     }
 
     void Start()
@@ -204,10 +219,28 @@ public class SC_FPSController : MonoBehaviour
 
         float movementDirectionY = moveDirection.y;
 
+        // Wall Grab: aktiv verlassen, wenn der Spieler per Input von der Wand weg steuert.
+        // Dot-Product zwischen World-Space-Inputrichtung und wallNormal: negativ/kleiner als
+        // -threshold heisst "zeigt von der Wand weg". Reine Maus-Drehung ohne Bewegungsinput
+        // (inputX/Y nahe 0) zaehlt nicht als Exit-Absicht.
+        if (isWallGrabbing)
+        {
+            Vector3 worldInputDir = (forward * inputX) + (right * inputY);
+            if (worldInputDir.sqrMagnitude > 0.01f)
+            {
+                float awayFromWallDot = Vector3.Dot(worldInputDir.normalized, wallNormal);
+                if (awayFromWallDot >= wallGrabExitInputThreshold)
+                {
+                    EndWallGrab();
+                    wallGrabReentryBlockedUntil = Time.time + wallGrabReentryCooldown;
+                }
+            }
+        }
+
         // Momentum/Inertia: horizontale Velocity folgt dem Input-Ziel statt hart gesetzt zu werden.
         // Am Boden schnellere Acceleration (direkter), in der Luft langsamer (Momentum-Erhalt + Air Control).
-        // isWallGrabbing/isGrappling: Ziel-Geschwindigkeit wird trotzdem berechnet, faehrt aber durch
-        // canMove-Gate oben ohnehin auf 0, falls die jeweilige Logik das vorsieht -> kein Sonderfall noetig.
+        // Wall-Grab: volle, ungebremste Air-Control, damit Maus/Input sofort durchschlaegt statt
+        // "Panzer"-Gefuehl durch die normale Air-Acceleration-Bremse.
         Vector3 targetHorizontalVelocity = (forward * curSpeedX) + (right * curSpeedY);
         Vector3 currentHorizontalVelocity = new Vector3(moveDirection.x, 0f, moveDirection.z);
 
@@ -215,6 +248,12 @@ public class SC_FPSController : MonoBehaviour
         if (characterController.isGrounded)
         {
             // Boden: instant, direkte Kontrolle -- kein Lerp/Trägheit beim normalen Laufen
+            newHorizontalVelocity = targetHorizontalVelocity;
+        }
+        else if (isWallGrabbing)
+        {
+            // Wall Grab: volle, instante Kontrolle -- Maus/Input soll sofort durchschlagen,
+            // kein "Panzer"-Gefuehl durch gebremste Air-Acceleration.
             newHorizontalVelocity = targetHorizontalVelocity;
         }
         else
@@ -328,7 +367,14 @@ public class SC_FPSController : MonoBehaviour
         {
             rotationX += -Input.GetAxis("Mouse Y") * lookSpeed;
             rotationX = Mathf.Clamp(rotationX, -lookXLimit, lookXLimit);
-            playerCamera.transform.localRotation = Quaternion.Euler(rotationX, 0, 0);
+
+            // Camera Lean: leichtes Tilt (Roll) in Strafe-Richtung fuer mehr Speed-Feedback.
+            // Nutzt inputY (Horizontal-Achse) aus der Bewegungsberechnung dieses Frames.
+            // Vorzeichen negativ, damit Lean bei A/Links nach links kippt (Roll-Konvention).
+            float targetLean = -inputY * maxLeanAngle;
+            currentLeanAngle = Mathf.Lerp(currentLeanAngle, targetLean, Time.deltaTime * leanSpeed);
+
+            playerCamera.transform.localRotation = Quaternion.Euler(rotationX, 0, currentLeanAngle);
             transform.rotation *= Quaternion.Euler(0, Input.GetAxis("Mouse X") * lookSpeed, 0);
         }
     }
@@ -379,6 +425,12 @@ public class SC_FPSController : MonoBehaviour
 
     public void StartWallGrab(Vector3 normal)
     {
+        if (Time.time < wallGrabReentryBlockedUntil)
+        {
+            // Spieler hat sich gerade erst aktiv von dieser Wand weg bewegt -> kein sofortiges Re-Snap
+            return;
+        }
+
         if (!isWallGrabbing && !characterController.isGrounded)
         {
             isWallGrabbing = true;
@@ -449,9 +501,6 @@ public class SC_FPSController : MonoBehaviour
 
     void OnGUI()
     {
-        if (!showDebugInfo)
-            return;
-
         if (isWallGrabbing)
         {
             GUI.Label(new Rect(10, 10, 300, 20), $"Wall Grab Time: {wallGrabTimer:F2}s");
