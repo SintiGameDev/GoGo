@@ -189,7 +189,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 68e4d62165498104f83dadac1461ad05, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  grappleSpeed: 350
+  grappleSpeed: 500
   killRadius: 2
   grabbableTag: Grabbable
   slowMotionTimeScale: 0.2
@@ -213,7 +213,7 @@ MonoBehaviour:
   disablePlayerCollisionWithGrabbables: 0
   colliderUpdateSmoothness: 5
   safetyMargin: 0.2
-  impactSurfaceBuffer: 0.6
+  impactSurfaceBuffer: 0.05
   fallbackImpactDistance: 2
   destroyEffect: {fileID: 0}
   grappleSound: {fileID: 0}
