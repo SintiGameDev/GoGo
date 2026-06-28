@@ -34,6 +34,9 @@ public class SurfController : MonoBehaviour
     public float dragCoefficient = 0.02f; // Natürliche Speed-Dämpfung bei hohen Geschwindigkeiten
     public bool useAsymptoticSpeedCap = true;
 
+    [Header("Debug")]
+    public bool showDebugInfo = false;
+
     private SC_FPSController fpsController;
     private VelocityMultiplier velocityMultiplier;
     private Camera playerCamera;
@@ -339,6 +342,9 @@ public class SurfController : MonoBehaviour
 
     void OnGUI()
     {
+        if (!showDebugInfo)
+            return;
+
         if ((isSurfing || currentSurfSpeed > 0) && enableSurfing)
         {
             float cameraPitch = GetNormalizedCameraPitch();

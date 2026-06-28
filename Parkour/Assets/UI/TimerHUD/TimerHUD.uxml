@@ -44,21 +44,26 @@
                 <ui:Label name="result-time-label" text="00:00.00" class="result-time" />
                 <ui:Label name="result-medal-name-label" text="Keine Medaille" class="result-medal-name" />
 
-                <ui:VisualElement name="result-divider" class="result-divider" />
-
-                <ui:VisualElement name="result-best-row" class="result-best-row">
-                    <ui:Label name="result-best-label" text="BESTZEIT" class="result-best-label" />
-                    <ui:Label name="result-best-time-label" text="00:00.00" class="result-best-time" />
+                <ui:VisualElement name="result-best-time-row" class="result-best-time-row">
+                    <ui:Label name="result-best-time-caption" text="BESTZEIT" class="result-best-time-caption" />
+                    <ui:Label name="result-best-time-label" text="—" class="result-best-time" />
                 </ui:VisualElement>
 
+                <ui:VisualElement name="result-divider" class="result-divider" />
+
                 <ui:VisualElement name="result-hints-row" class="result-hints-row">
-                    <ui:VisualElement name="result-hint-restart" class="result-hint">
-                        <ui:Label name="result-hint-restart-key" text="R" class="result-hint-key" />
-                        <ui:Label text="Neustart" class="result-hint-text" />
+                    <ui:VisualElement name="hint-restart" class="result-hint">
+                        <ui:VisualElement name="hint-restart-key" class="key-badge">
+                            <ui:Label name="hint-restart-key-label" text="R" class="key-badge-label" />
+                        </ui:VisualElement>
+                        <ui:Label text="Neustart" class="result-hint-label" />
                     </ui:VisualElement>
-                    <ui:VisualElement name="result-hint-next" class="result-hint">
-                        <ui:Label name="result-hint-next-key" text="ENTER" class="result-hint-key" />
-                        <ui:Label text="Nächstes Level" class="result-hint-text" />
+
+                    <ui:VisualElement name="hint-next" class="result-hint">
+                        <ui:VisualElement name="hint-next-key" class="key-badge key-badge--wide">
+                            <ui:Label name="hint-next-key-label" text="LEERTASTE" class="key-badge-label key-badge-label--small" />
+                        </ui:VisualElement>
+                        <ui:Label text="Nächstes Level" class="result-hint-label" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>

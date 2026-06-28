@@ -21,7 +21,7 @@ public class ResultScreenController : MonoBehaviour
 
     [Header("Input")]
     public KeyCode restartKey = KeyCode.R;
-    public KeyCode nextLevelKey = KeyCode.Return;
+    public KeyCode nextLevelKey = KeyCode.Space;
 
     [Tooltip("Zusätzliche Verzögerung nach Zielankunft, bevor Input akzeptiert wird (verhindert versehentliches Sofort-Restarten durch denselben Tastendruck, der z.B. eine andere Aktion ausgelöst hat)")]
     public float inputDelayAfterFinish = 0.3f;

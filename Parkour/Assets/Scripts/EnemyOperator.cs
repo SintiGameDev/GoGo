@@ -44,6 +44,10 @@ public class EnemyOperator : MonoBehaviour
     public AudioClip grappleSound;
     public AudioClip destroySound;
 
+    [Header("Debug")]
+    [Tooltip("Zeigt das OnGUI-Debug-Overlay (Grappling-Distanz, Slow-Motion-Status, Trigger-Info) - bei Bedarf ausschalten, um die Anzeige zu verstecken, ohne den Code zu entfernen")]
+    public bool showDebugInfo = false;
+
     private SC_FPSController fpsController;
     private CharacterController characterController;
     private bool isGrappling = false;
@@ -613,6 +617,9 @@ public class EnemyOperator : MonoBehaviour
 
     void OnGUI()
     {
+        if (!showDebugInfo)
+            return;
+
         if (isGrappling)
         {
             float distance = targetEnemy != null ?

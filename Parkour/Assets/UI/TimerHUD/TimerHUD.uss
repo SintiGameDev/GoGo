@@ -228,6 +228,10 @@
     align-items: center;
     border-width: 1px;
     border-color: rgba(255, 255, 255, 0.1);
+    /* Feste Breite statt automatischem Wachsen mit dem Inhalt - verhinderte
+       vorher, dass die Card je nach Ziffern-Breite der Zeit unterschiedlich
+       breit wurde und dadurch am Bildschirmrand abgeschnitten werden konnte. */
+    width: 420px;
 }
 
 .result-title {
@@ -274,68 +278,88 @@
 
 /* ---------- Bestzeit-Zeile im Result-Card ---------- */
 
-.result-divider {
-    width: 100%;
-    height: 1px;
-    background-color: rgba(255, 255, 255, 0.1);
-    margin-top: 18px;
-    margin-bottom: 14px;
-}
-
-.result-best-row {
+.result-best-time-row {
     flex-direction: row;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    margin-bottom: 18px;
+    margin-top: 16px;
 }
 
-.result-best-label {
-    font-size: 12px;
-    letter-spacing: 2px;
+.result-best-time-caption {
+    font-size: 11px;
+    letter-spacing: 1.5px;
     color: var(--color-text-dim);
     -unity-font-style: bold;
+    margin-right: 8px;
 }
 
 .result-best-time {
-    font-size: 18px;
+    font-size: 16px;
     -unity-font-style: bold;
     color: var(--color-text-main);
 }
 
-/* Bestzeit hervorheben, wenn der aktuelle Lauf eine neue Bestzeit ist */
 .result-best-time--new {
     color: var(--color-gold);
 }
 
-/* ---------- Input-Hinweise (R / Enter) ---------- */
+/* ---------- Trennlinie vor den Tasten-Hinweisen ---------- */
+
+.result-divider {
+    height: 1px;
+    width: 100%;
+    background-color: rgba(255, 255, 255, 0.1);
+    margin-top: 20px;
+    margin-bottom: 16px;
+}
+
+/* ---------- Tasten-Hinweise (Neustart / Nächstes Level) ---------- */
 
 .result-hints-row {
     flex-direction: row;
     justify-content: center;
+    align-items: center;
+    /* width: 100% statt automatischem Wachsen - hält beide Hints unabhängig
+       von Textlänge symmetrisch innerhalb der festen Card-Breite. */
+    width: 100%;
 }
 
 .result-hint {
     flex-direction: row;
     align-items: center;
-    margin-left: 10px;
+    margin-left: 16px;
+    margin-right: 16px;
+}
+
+.key-badge {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.25);
+    align-items: center;
+    justify-content: center;
     margin-right: 10px;
 }
 
-.result-hint-key {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 5px;
-    border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.2);
-    padding: 3px 9px;
-    margin-right: 8px;
-    font-size: 12px;
+.key-badge--wide {
+    min-width: 96px;
+}
+
+.key-badge-label {
+    font-size: 13px;
     -unity-font-style: bold;
     color: var(--color-text-main);
+    -unity-text-align: middle-center;
 }
 
-.result-hint-text {
-    font-size: 12px;
+.key-badge-label--small {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.result-hint-label {
+    font-size: 13px;
     color: var(--color-text-dim);
 }
-
