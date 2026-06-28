@@ -9,6 +9,11 @@ public class EnemyOperator : MonoBehaviour
     public float killRadius = 2f;
     public string grabbableTag = "Grabbable";
 
+    [Header("Momentum nach erfolgreichem Grapple")]
+    [Tooltip("Wie viel der grappleSpeed nach einem ERFOLGREICHEN Grapple (Gegner erreicht/zerstört) als Schwung erhalten bleibt. 0 = kompletter Stop wie bisher, 1 = volle grappleSpeed bleibt erhalten. Gilt NICHT bei abgebrochenem Grapple (EndGrapple(false)).")]
+    [Range(0f, 1.5f)]
+    public float momentumRetentionMultiplier = 0.8f;
+
     [Header("Slow Motion Settings")]
     public float slowMotionTimeScale = 0.2f;
     public float slowMotionDuration = 0.15f;
@@ -57,6 +62,14 @@ public class EnemyOperator : MonoBehaviour
     private SC_FPSController fpsController;
     private CharacterController characterController;
     private bool isGrappling = false;
+
+    // Letzte tatsächliche Flugrichtung während des Grapples (wird in jedem
+    // UpdateGrapple()-Tick aktualisiert) - EndGrapple(true) nutzt das, um dem
+    // Spieler beim Loslassen seinen Schwung in genau dieser Richtung mitzugeben,
+    // statt dass er abrupt stehen bleibt (SC_FPSController.moveDirection wurde
+    // während des Grapples nie aktualisiert, da die Bewegung über einen
+    // separaten direkten characterController.Move()-Aufruf hier im Skript läuft).
+    private Vector3 lastGrappleDirection = Vector3.zero;
     private Vector3 grappleTarget;
     private GameObject targetEnemy;
 
@@ -423,6 +436,15 @@ public class EnemyOperator : MonoBehaviour
         float distance = toTarget.magnitude;
         Vector3 direction = distance > 0.0001f ? toTarget / distance : Vector3.zero;
 
+        // Für den Momentum-Erhalt nach EndGrapple(true) merken, in welche Richtung
+        // der Spieler sich GERADE bewegt - direction kann sich über die Dauer des
+        // Grapples leicht ändern (Gegner/Spieler bewegen sich), daher hier bei
+        // jedem Tick aktualisieren statt nur einmal beim Start zu berechnen.
+        if (direction != Vector3.zero)
+        {
+            lastGrappleDirection = direction;
+        }
+
         // Hit Tracer: nutzt EXAKT dieselbe Position + Richtung wie die Bewegung.
         // Vorher: Ray ging Richtung bounds.center, distance/direction aber Richtung
         // transform.position (Pivot) -> zwei verschiedene Punkte, dadurch inkonsistent
@@ -551,6 +573,17 @@ public class EnemyOperator : MonoBehaviour
         if (fpsController != null)
         {
             fpsController.SetGrapplingState(false);
+
+            // Schwung beim ERFOLGREICHEN Grapple-Abschluss mitgeben: dies ist der
+            // tatsächliche Erfolgspfad (DestroyEnemyWithSlowMotion -> StartSlowMotion),
+            // NICHT EndGrapple(true) - letzteres wird im Code nirgends mit "true"
+            // aufgerufen. SC_FPSController.moveDirection.x/.z wurde während des
+            // gesamten Grapples nie aktualisiert (separate direkte Move()-Aufrufe in
+            // UpdateGrapple()), daher hier explizit nachträglich setzen, bevor der
+            // spätere Auto-Jump (PerformAutoJump -> ForceJump) nur die Y-Komponente
+            // anfasst und die hier gesetzte horizontale Velocity unangetastet lässt.
+            Vector3 momentumVelocity = lastGrappleDirection * grappleSpeed * momentumRetentionMultiplier;
+            fpsController.ModifyMoveDirection(momentumVelocity);
         }
 
         Debug.Log("Slow Motion gestartet!");
@@ -604,6 +637,18 @@ public class EnemyOperator : MonoBehaviour
         if (fpsController != null)
         {
             fpsController.SetGrapplingState(false);
+
+            // Schwung nur bei ERFOLGREICHEM Grapple mitgeben (Gegner erreicht/
+            // zerstört) - bei einem Abbruch (z.B. Gegner verschwindet während
+            // des Grapples) bewusst NICHT, das soll sich nicht wie eine Belohnung
+            // anfühlen. SC_FPSController.moveDirection wurde während des Grapples
+            // nie aktualisiert (siehe lastGrappleDirection-Kommentar oben), daher
+            // hier explizit nachträglich die tatsächliche Flugrichtung+Tempo setzen.
+            if (successful)
+            {
+                Vector3 momentumVelocity = lastGrappleDirection * grappleSpeed * momentumRetentionMultiplier;
+                fpsController.ModifyMoveDirection(momentumVelocity);
+            }
         }
 
         Debug.Log(successful ? "Grapple erfolgreich!" : "Grapple abgebrochen");
