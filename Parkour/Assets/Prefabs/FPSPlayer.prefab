@@ -233,6 +233,17 @@ MonoBehaviour:
   jumpSpeed: 30
   wallJumpSpeed: 20
   gravity: 50
+  riseGravityMultiplier: 1
+  fallGravityMultiplier: 1.8
+  lowJumpGravityMultiplier: 2.5
+  coyoteTime: 0.12
+  jumpBufferTime: 0.12
+  airControlFactor: 0.7
+  groundAcceleration: 35
+  airAcceleration: 15
+  wallJumpMomentumRetain: 0.95
+  apexThreshold: 1.5
+  apexGravityMultiplier: 0.5
   playerCamera: {fileID: 2304776757904105273}
   lookSpeed: 3
   lookXLimit: 90
