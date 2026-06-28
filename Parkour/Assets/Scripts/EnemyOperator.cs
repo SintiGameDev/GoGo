@@ -423,9 +423,11 @@ public class EnemyOperator : MonoBehaviour
         float distance = toTarget.magnitude;
         Vector3 direction = distance > 0.0001f ? toTarget / distance : Vector3.zero;
 
-        // Hit Tracer: berechnet jeden Frame den exakten Abstand zur Mesh-Oberfläche
-        // entlang der Bewegungsrichtung (Ray-vs-Bounds, kein Physics-Raycast nötig)
-        float impactDistance = CalculateImpactDistance(targetEnemy, transform.position);
+        // Hit Tracer: nutzt EXAKT dieselbe Position + Richtung wie die Bewegung.
+        // Vorher: Ray ging Richtung bounds.center, distance/direction aber Richtung
+        // transform.position (Pivot) -> zwei verschiedene Punkte, dadurch inkonsistent
+        // (Instant-Kill bei großem Buffer, "Kriechen" + Clipping bei kleinem Buffer).
+        float impactDistance = CalculateImpactDistance(targetEnemy, transform.position, direction, distance);
 
         if (characterController != null)
         {
@@ -450,10 +452,15 @@ public class EnemyOperator : MonoBehaviour
     }
 
     // NEUE: Hit Tracer - berechnet den Abstand zur tatsächlichen Mesh-Oberfläche
-    // statt sich auf den künstlichen killRadius zu verlassen. Nutzt Bounds.IntersectRay
-    // (analytischer Ray-vs-AABB-Test), funktioniert unabhängig vom Collider-Zustand.
-    float CalculateImpactDistance(GameObject enemy, Vector3 fromPosition)
+    // entlang DERSELBEN Linie, auf der sich der Spieler bewegt (fromPosition -> direction).
+    // So sind Distance-Check und Bewegungs-Clamp immer konsistent zueinander.
+    float CalculateImpactDistance(GameObject enemy, Vector3 fromPosition, Vector3 direction, float distanceToTarget)
     {
+        if (direction == Vector3.zero)
+        {
+            return Mathf.Max(killRadius, fallbackImpactDistance);
+        }
+
         Renderer rend = enemy.GetComponent<Renderer>();
         if (rend == null)
         {
@@ -463,46 +470,39 @@ public class EnemyOperator : MonoBehaviour
         if (rend != null)
         {
             Bounds bounds = rend.bounds;
-            Vector3 toCenter = bounds.center - fromPosition;
-            float fullDist = toCenter.magnitude;
+            Ray tracerRay = new Ray(fromPosition, direction);
 
-            if (fullDist > 0.0001f)
+            if (bounds.IntersectRay(tracerRay, out float hitDistance))
             {
-                Ray tracerRay = new Ray(fromPosition, toCenter.normalized);
-
-                if (bounds.IntersectRay(tracerRay, out float hitDistance))
-                {
-                    // hitDistance = Abstand bis zur Bounds-Oberfläche (0, falls bereits innen)
-                    return Mathf.Max(0f, hitDistance + impactSurfaceBuffer);
-                }
+                // Clamp: impactDistance darf NIE größer sein als die tatsächlich
+                // verbleibende Distanz zum Pivot. Ein riesiger Buffer führt dadurch
+                // kontrolliert zu "sofort zerstören", statt zu inkonsistentem Verhalten.
+                return Mathf.Clamp(hitDistance + impactSurfaceBuffer, 0f, distanceToTarget);
             }
         }
 
         // Fallback, falls kein Renderer gefunden wurde oder der Ray die Bounds verfehlt
-        return Mathf.Max(killRadius, fallbackImpactDistance);
+        return Mathf.Min(Mathf.Max(killRadius, fallbackImpactDistance), distanceToTarget);
     }
 
     void OnControllerColliderHit(ControllerColliderHit hit)
     {
-        // Sollte nicht mehr passieren wenn useTriggersInsteadOfColliders = true
-        if (isGrappling && hit.gameObject == targetEnemy)
-        {
-            DestroyEnemyWithSlowMotion();
-        }
+        // ABSICHTLICH DEAKTIVIERT: Der Hit-Tracer in UpdateGrapple() entscheidet bereits
+        // jeden Frame geometrisch exakt (Renderer.bounds), wann der Enemy zerstört wird.
+        // Diese Methode reagierte vorher zusätzlich auf physische Collider-Treffer -
+        // das ist riskant, weil die dynamische Collider-Größenänderung (enemyColliders /
+        // UpdateDynamicColliders) Radius-Werte setzt, die von der Physics-Engine nicht
+        // immer im exakt selben Frame übernommen werden. Dadurch könnte dieser Callback
+        // mit einem veralteten (zu großen) Radius feuern und die Zeitlupe zu früh auslösen.
     }
 
     // NEUE: OnTriggerEnter für Trigger-basierte Collider
     void OnTriggerEnter(Collider other)
     {
-        if (isGrappling && other.gameObject == targetEnemy)
-        {
-            float distance = Vector3.Distance(transform.position, targetEnemy.transform.position);
-
-            if (distance <= killRadius)
-            {
-                DestroyEnemyWithSlowMotion();
-            }
-        }
+        // ABSICHTLICH DEAKTIVIERT: gleicher Grund wie OnControllerColliderHit oben.
+        // Der dynamisch resizte SphereCollider (enemyColliders) ist NICHT mehr die
+        // Quelle für den Destroy-Zeitpunkt - nur noch der Hit-Tracer in UpdateGrapple().
+        // Damit kann die Collider-Größenänderung keinen Einfluss mehr auf das Timing haben.
     }
 
     void DestroyEnemyWithSlowMotion()

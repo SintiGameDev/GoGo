@@ -213,7 +213,7 @@ MonoBehaviour:
   disablePlayerCollisionWithGrabbables: 0
   colliderUpdateSmoothness: 5
   safetyMargin: 0.2
-  impactSurfaceBuffer: 5
+  impactSurfaceBuffer: 2
   fallbackImpactDistance: 2
   destroyEffect: {fileID: 0}
   grappleSound: {fileID: 0}
@@ -265,7 +265,7 @@ MonoBehaviour:
   fovChangeDuration: 0.2
   fovSpeedThreshold: 15
   speedTransitionRate: 50
-  maxTotalVelocity: 65
+  maxTotalVelocity: 85
   canMove: 1
 --- !u!114 &3999707696816788914
 MonoBehaviour:
