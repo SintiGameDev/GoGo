@@ -258,30 +258,56 @@ Shader "Traumwelt/VertexNoiseDeform"
                 if (_RecalcNormals > 0.5)
                 {
                     // Normalen per finiter Differenzen neu berechnen, da das
-                    // Displacement die Oberflaeche verformt (Tangent-Sample-Trick)
-                    float e = _NormalRecalcOffset;
+                    // Displacement die Oberflaeche verformt (Tangent-Sample-Trick).
+                    //
+                    // FIX (Flackern bei mehreren Octaves):
+                    // (a) Sample-Offset wird an die hoechste Octave-Frequenz
+                    //     gekoppelt, damit die Differenz den echten Gradienten
+                    //     misst statt hochfrequentes Aliasing.
+                    // (b) Zentrale Differenzen (+e/-e) -> stabiler als Vorwaerts-Diff.
+                    // (c) KEIN harter Fallback mehr bei degeneriertem cross(): das
+                    //     binaere Umschalten zwischen Recalc- und Original-Normale
+                    //     war pro Frame zwischen zwei Zustaenden gesprungen
+                    //     (= das kamera-/lichtunabhaengige Flackern). Stattdessen
+                    //     weiches Blending ueber eine skalenunabhaengige "confidence"
+                    //     (= |sin(Winkel)| zwischen den beiden Flaechen-Tangenten).
+                    int octForE = (int)_Octaves;
+                    float highestFreq = _NoiseScale * pow(max(_OctaveLacunarity, 1.0), max(octForE - 1, 0));
+                    float e = _NormalRecalcOffset / max(1.0, highestFreq);
 
-                    float3 tangentApprox = normalize(abs(IN.normalOS.y) < 0.99
-                        ? cross(IN.normalOS, float3(0, 1, 0))
-                        : cross(IN.normalOS, float3(1, 0, 0)));
-                    float3 bitangentApprox = normalize(cross(IN.normalOS, tangentApprox));
+                    float3 nOS = normalize(IN.normalOS);
+                    float3 tangentApprox = normalize(abs(nOS.y) < 0.99
+                        ? cross(nOS, float3(0, 1, 0))
+                        : cross(nOS, float3(1, 0, 0)));
+                    float3 bitangentApprox = normalize(cross(nOS, tangentApprox));
 
-                    float3 posA = IN.positionOS.xyz + tangentApprox * e;
-                    float3 posB = IN.positionOS.xyz + bitangentApprox * e;
+                    float3 posTp = IN.positionOS.xyz + tangentApprox * e;
+                    float3 posTm = IN.positionOS.xyz - tangentApprox * e;
+                    float3 posBp = IN.positionOS.xyz + bitangentApprox * e;
+                    float3 posBm = IN.positionOS.xyz - bitangentApprox * e;
 
-                    float3 worldA = TransformObjectToWorld(posA);
-                    float3 worldB = TransformObjectToWorld(posB);
+                    float3 dispTp = DisplacedPosition(posTp, nOS, TransformObjectToWorld(posTp));
+                    float3 dispTm = DisplacedPosition(posTm, nOS, TransformObjectToWorld(posTm));
+                    float3 dispBp = DisplacedPosition(posBp, nOS, TransformObjectToWorld(posBp));
+                    float3 dispBm = DisplacedPosition(posBm, nOS, TransformObjectToWorld(posBm));
 
-                    float3 dispA = DisplacedPosition(posA, normalize(IN.normalOS), worldA);
-                    float3 dispB = DisplacedPosition(posB, normalize(IN.normalOS), worldB);
+                    // Tangenten der verformten Oberflaeche (zentrale Differenz)
+                    float3 dA = dispTp - dispTm;
+                    float3 dB = dispBp - dispBm;
 
-                    float3 dA = dispA - displacedOS;
-                    float3 dB = dispB - displacedOS;
+                    float3 crossResult = cross(dA, dB);
+                    float crossLen = length(crossResult);
+                    float denom = length(dA) * length(dB);
 
-                    newNormalOS = normalize(cross(dA, dB));
-                    // Richtung zur Original-Normalen hin korrigieren falls invertiert
-                    if (dot(newNormalOS, IN.normalOS) < 0.0)
-                        newNormalOS = -newNormalOS;
+                    // confidence in [0,1]: 0 = degeneriert/parallel, 1 = sauber orthogonal
+                    float confidence = (denom > 1e-20) ? saturate(crossLen / denom) : 0.0;
+
+                    float3 recalcN = (crossLen > 1e-20) ? (crossResult / crossLen) : nOS;
+                    if (dot(recalcN, nOS) < 0.0)
+                        recalcN = -recalcN;
+
+                    // Weiches Blending statt hartem Sprung -> kein Flackern mehr
+                    newNormalOS = normalize(lerp(nOS, recalcN, confidence));
                 }
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(displacedOS);
@@ -315,8 +341,21 @@ Shader "Traumwelt/VertexNoiseDeform"
                 half3 normalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, IN.uv), _NormalStrength);
 
                 float sgn = IN.tangentWS.w;
-                float3 bitangent = sgn * cross(IN.normalWS.xyz, IN.tangentWS.xyz);
-                half3x3 tangentToWorld = half3x3(IN.tangentWS.xyz, bitangent.xyz, IN.normalWS.xyz);
+                float3 normalWS_raw = normalize(IN.normalWS.xyz);
+                float3 tangentWS_raw = normalize(IN.tangentWS.xyz);
+                float3 bitangent = sgn * cross(normalWS_raw, tangentWS_raw);
+
+                // DIAGNOSE: Schutz gegen degenerierte Tangent-Basis (NaN-Quelle testen)
+                float bitangentLenSq = dot(bitangent, bitangent);
+                if (bitangentLenSq < 1e-8)
+                {
+                    bitangent = cross(normalWS_raw, float3(0,1,0));
+                    if (dot(bitangent, bitangent) < 1e-8)
+                        bitangent = cross(normalWS_raw, float3(1,0,0));
+                }
+                bitangent = normalize(bitangent);
+
+                half3x3 tangentToWorld = half3x3(tangentWS_raw, bitangent.xyz, normalWS_raw);
                 half3 normalWS = normalize(TransformTangentToWorld(normalTS, tangentToWorld));
 
                 half3 emission = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, IN.uv).rgb * _EmissionColor.rgb;
