@@ -32,25 +32,28 @@ public class SpeedlinesFeature : ScriptableRendererFeature
         if (settings.speedlinesMaterial == null) return;
         if (renderingData.cameraData.cameraType != CameraType.Game) return;
 
-        pass.SetTarget(renderer.cameraColorTargetHandle);
+        // WICHTIG: cameraColorTargetHandle darf NICHT hier abgerufen werden ->
+        // "You can only call cameraColorTargetHandle inside the scope of a
+        // ScriptableRenderPass". Stattdessen die renderer-Referenz an den Pass
+        // uebergeben und das Handle erst in Execute() (innerhalb des Passes) holen.
+        pass.SetRenderer(renderer);
         renderer.EnqueuePass(pass);
     }
 
     private class SpeedlinesPass : ScriptableRenderPass
     {
         private readonly Material material;
-        private RTHandle source;
+        private ScriptableRenderer renderer;
         private RTHandle tempTexture;
-        private static readonly int TempId = Shader.PropertyToID("_SpeedlinesTemp");
 
         public SpeedlinesPass(Material mat)
         {
             material = mat;
         }
 
-        public void SetTarget(RTHandle colorHandle)
+        public void SetRenderer(ScriptableRenderer activeRenderer)
         {
-            source = colorHandle;
+            renderer = activeRenderer;
         }
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
@@ -62,7 +65,11 @@ public class SpeedlinesFeature : ScriptableRendererFeature
 
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
-            if (material == null) return;
+            if (material == null || renderer == null) return;
+
+            // Handle erst hier abrufen -- wir sind jetzt innerhalb des Pass-Scopes
+            RTHandle source = renderer.cameraColorTargetHandle;
+            if (source == null) return;
 
             CommandBuffer cmd = CommandBufferPool.Get("Speedlines");
 

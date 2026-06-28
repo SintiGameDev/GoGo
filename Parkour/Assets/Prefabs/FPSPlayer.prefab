@@ -422,7 +422,7 @@ MonoBehaviour:
   intensityLerpSpeed: 6
   lineCount: 24
   lineScrollSpeed: 1.2
-  innerRadius: 0.35
+  innerRadius: 2
   lineColor: {r: 1, g: 1, b: 1, a: 0.6}
   factorInJumpBoost: 1
   jumpBoostInfluence: 0.5
