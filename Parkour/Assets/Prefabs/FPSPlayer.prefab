@@ -14,14 +14,11 @@ GameObject:
   - component: {fileID: 3179347948394799919}
   - component: {fileID: 4893620623425000444}
   - component: {fileID: 6125933404379417880}
-  - component: {fileID: 3999707696816788914}
-  - component: {fileID: 6049805492977812032}
-  - component: {fileID: 375951632665203206}
-  - component: {fileID: 2584267313266014871}
   - component: {fileID: 8216699775367567169}
   - component: {fileID: 2521946580280787812}
   - component: {fileID: 1003731328612656483}
   - component: {fileID: 7531474828213185006}
+  - component: {fileID: 2196948906703222257}
   m_Layer: 0
   m_Name: FPSPlayer
   m_TagString: Player
@@ -190,10 +187,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 68e4d62165498104f83dadac1461ad05, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  grappleSpeed: 500
+  grappleSpeed: 2000
+  grappleStartSpeedFactor: 0.25
+  grappleAccelTime: 0.05
+  grappleAccelCurvePower: 0.5
   killRadius: 2
   grabbableTag: Grabbable
-  momentumRetentionMultiplier: 0.8
+  momentumRetentionMultiplier: 1.34
   slowMotionTimeScale: 0.2
   slowMotionDuration: 0.02
   autoJumpForce: 40
@@ -203,11 +203,12 @@ MonoBehaviour:
   grabbableLayerMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  highlightColor: {r: 0.015686274, g: 1, b: 0.94338894, a: 1}
-  highlightIntensity: 0.4
-  useEmission: 1
+  highlightStrength: 1
+  pulseHighlight: 1
+  pulseSpeed: 4
+  pulseMin: 0.215
   minColliderRadius: 3
-  maxColliderRadius: 8
+  maxColliderRadius: 15
   minScaleDistance: 2
   maxScaleDistance: 100
   enableDynamicColliders: 1
@@ -215,8 +216,9 @@ MonoBehaviour:
   disablePlayerCollisionWithGrabbables: 0
   colliderUpdateSmoothness: 5
   safetyMargin: 0.2
-  impactSurfaceBuffer: 2
-  fallbackImpactDistance: 2
+  killSurfaceRadius: 2
+  impactSurfaceBuffer: 1
+  fallbackImpactDistance: 0.6
   destroyEffect: {fileID: 0}
   grappleSound: {fileID: 0}
   destroySound: {fileID: 8300000, guid: 17727032be7e3c149b5d4c8ece783f79, type: 3}
@@ -276,117 +278,6 @@ MonoBehaviour:
   speedTransitionRate: 50
   maxTotalVelocity: 85
   canMove: 1
---- !u!114 &3999707696816788914
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1036552637450684959}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 35fb9220adfe5844a8c35faf08923bf0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  playerCamera: {fileID: 2304776757904105273}
-  landingImpactAmount: 1
-  landingImpactDuration: 0.5
-  landingEaseType: 24
-  wallGrabImpactAmount: 1.5
-  wallGrabImpactDuration: 0.5
-  wallGrabEaseType: 2
-  minFallVelocityForImpact: 15
-  maxFallVelocityForMaxImpact: 25
-  showDebugInfo: 0
---- !u!114 &6049805492977812032
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1036552637450684959}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 34769afd056883c46bd2b390b611a10b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  footstepSounds: []
-  pitchRange: {x: 0.9, y: 1.1}
-  timeBetweenWalkSteps: 0.5
-  timeBetweenRunSteps: 0.3
---- !u!114 &375951632665203206
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1036552637450684959}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a09440bc71c74bb4689d972c22e4816e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  baseAcceleration: 1.2
-  maxAccelerationDown: 15
-  maxAccelerationUp: 15
-  verticalBoostMultiplier: 1.5
-  maxSurfSpeed: 20
-  softCapThreshold: 0.8
-  surfSensitivity: 1.2
-  downAngleThreshold: 10
-  upAngleThreshold: -10
-  maxDownAngle: 80
-  maxUpAngle: -90
-  enableAirStrafe: 1
-  airStrafeAcceleration: 1.5
-  airStrafeMaxSpeed: 5
-  enableSurfing: 0
-  speedDecayRate: 5
-  speedFloorPercentage: 0.3
-  decayCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  dragCoefficient: 0.02
-  useAsymptoticSpeedCap: 1
-  showDebugInfo: 0
---- !u!114 &2584267313266014871
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1036552637450684959}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7221d745ac9b5e142aaf7f3cd9b8bdd4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  playerCamera: {fileID: 2304776757904105273}
-  surfController: {fileID: 375951632665203206}
-  surfFOVBonus: 20
-  fovTransitionSpeed: 0.2
-  showDebugInfo: 0
 --- !u!114 &8216699775367567169
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -427,6 +318,7 @@ MonoBehaviour:
   maxGrindSpeed: 45
   entrySpeedMultiplier: 1.5
   verticalOffset: 0.5
+  magnetSnapDuration: 0.12
   yawAlignSpeed: 12
   regrindCooldown: 0.3
   earlyExitForwardBoost: 25
@@ -441,7 +333,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1036552637450684959}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ee8707d1f4ee13d4289ebb2e6737a890, type: 3}
   m_Name: 
@@ -496,6 +388,200 @@ MonoBehaviour:
   doubleTapWindow: 0.3
   dashCooldown: 1.2
   showDebugInfo: 0
+--- !u!114 &2196948906703222257
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1036552637450684959}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 79d1c77ec423f0a4aacacbc82e1bba3d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetCamera: {fileID: 2304776757904105273}
+  velocityMultiplier: {fileID: 8216699775367567169}
+  targetVolume: {fileID: 0}
+  autoCreateVolume: 1
+  snapInFovDip: 10
+  snapInDuration: 0.04
+  snapInCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.35
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  flightFovPush: 25
+  flightFovCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  flightDistortion: -0.505
+  distortionCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  impactDistortionKick: -0.35
+  flightAberration: 0.35
+  aberrationCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  impactAberrationSpike: 0.8
+  flightVignette: 0.2
+  vignetteCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  impactVignettePunch: 0.51
+  impactAttack: 0.04
+  impactRelease: 0.3
+  impactReleaseCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.4
+      value: 0.15
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  scaleWithCombo: 1
+  comboInfluenceMin: 0.75
+  comboInfluenceMax: 1.5
+  releaseSpeedOnAbort: 6
+  logHooks: 0
 --- !u!1 &2876241451336742777
 GameObject:
   m_ObjectHideFlags: 0
@@ -615,7 +701,7 @@ MonoBehaviour:
   m_RenderPostProcessing: 1
   m_Antialiasing: 1
   m_AntialiasingQuality: 2
-  m_StopNaN: 0
+  m_StopNaN: 1
   m_Dithering: 1
   m_ClearDepth: 1
   m_AllowXRRendering: 1
@@ -5770,7 +5856,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2b1106f2d31c92649bc20eef4de277cd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  surfController: {fileID: 375951632665203206}
+  surfController: {fileID: 0}
   fpsController: {fileID: 6125933404379417880}
   characterController: {fileID: 5332580065431364861}
   wallLayerMask:

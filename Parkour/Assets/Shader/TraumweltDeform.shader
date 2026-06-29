@@ -6,6 +6,7 @@ Shader "Custom/TraumweltDeform"
         _BaseColor   ("Base Color", Color) = (0.5, 0.5, 0.6, 1)
         _Smoothness  ("Smoothness", Range(0,1)) = 0.5
         _Metallic    ("Metallic", Range(0,1)) = 0.0
+        [HDR] _EmissionColor ("Emission Color", Color) = (0, 0, 0, 1)
 
         [Header(Displacement)]
         _NoiseScale  ("Noise Scale", Float) = 2.0
@@ -16,7 +17,7 @@ Shader "Custom/TraumweltDeform"
 
     SubShader
     {
-        Tags { "RenderType"="Opaque" "RenderPipeline"="UniversalPipeline" }
+        Tags { "RenderType"="Opaque" "RenderPipeline"="UniversalPipeline" "DisableBatching"="True" }
         LOD 300
 
         // ---------------------------------------------------------------
@@ -27,6 +28,7 @@ Shader "Custom/TraumweltDeform"
             float4 _BaseColor;
             float  _Smoothness;
             float  _Metallic;
+            float4 _EmissionColor;
             float  _NoiseScale;
             float  _NoiseAmp;
             float  _NoiseSpeed;
@@ -149,6 +151,7 @@ Shader "Custom/TraumweltDeform"
 
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _FORWARD_PLUS
             #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_SCREEN
@@ -166,6 +169,7 @@ Shader "Custom/TraumweltDeform"
                 float4 positionCS  : SV_POSITION;
                 float3 positionWS  : TEXCOORD0;
                 float3 normalWS    : TEXCOORD1;
+                float4 screenPos   : TEXCOORD2;
             };
 
             Varyings vert (Attributes IN)
@@ -179,6 +183,7 @@ Shader "Custom/TraumweltDeform"
                 OUT.positionCS = posInputs.positionCS;
                 OUT.positionWS = posInputs.positionWS;
                 OUT.normalWS   = TransformObjectToWorldNormal(nrm);
+                OUT.screenPos  = ComputeScreenPos(posInputs.positionCS);
                 return OUT;
             }
 
@@ -189,6 +194,11 @@ Shader "Custom/TraumweltDeform"
                 inputData.normalWS   = normalize(IN.normalWS);
                 inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(IN.positionWS);
                 inputData.shadowCoord = TransformWorldToShadowCoord(IN.positionWS);
+                inputData.fogCoord = 0;
+                inputData.vertexLighting = half3(0, 0, 0);
+                inputData.bakedGI = SampleSH(inputData.normalWS);
+                inputData.normalizedScreenSpaceUV = IN.screenPos.xy / IN.screenPos.w;
+                inputData.shadowMask = half4(1, 1, 1, 1);
 
                 SurfaceData surfaceData = (SurfaceData)0;
                 surfaceData.albedo     = _BaseColor.rgb;
@@ -196,6 +206,11 @@ Shader "Custom/TraumweltDeform"
                 surfaceData.smoothness = _Smoothness;
                 surfaceData.alpha      = 1.0;
                 surfaceData.occlusion  = 1.0;
+                surfaceData.specular   = half3(0, 0, 0);
+                surfaceData.clearCoatMask = 0;
+                surfaceData.clearCoatSmoothness = 0;
+                surfaceData.normalTS = half3(0, 0, 1);
+                surfaceData.emission = _EmissionColor.rgb;
 
                 return UniversalFragmentPBR(inputData, surfaceData);
             }

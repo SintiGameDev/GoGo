@@ -152,7 +152,7 @@ public class SurfContactParticles : MonoBehaviour
     {
         if (surfController == null)
         {
-            Debug.LogError("❌ SurfContactParticles: SurfController nicht gefunden!");
+            //Debug.LogError("❌ SurfContactParticles: SurfController nicht gefunden!");
         }
 
         if (playerTransform == null)

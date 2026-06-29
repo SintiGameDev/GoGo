@@ -6,6 +6,18 @@ public class EnemyOperator : MonoBehaviour
 {
     [Header("Grapple Settings")]
     public float grappleSpeed = 25f;
+
+    [Header("Magnet-Anziehung (Ease-In)")]
+    [Tooltip("Geschwindigkeit ganz am Anfang des Grapples (relativ zu grappleSpeed, 0-1). " +
+             "Niedrig = deutlich spürbares 'Anschnappen' statt sofortiger Vollgeschwindigkeit.")]
+    [Range(0f, 1f)]
+    public float grappleStartSpeedFactor = 0.25f;
+    [Tooltip("Sekunden, bis die volle grappleSpeed erreicht ist (Ease-In-Dauer). " +
+             "Kleiner = schnellerer, snappier Magnet-Ruck.")]
+    public float grappleAccelTime = 0.18f;
+    [Tooltip("Kurvenform des Ease-In: <1 = langsamer Start mit hartem Schub am Ende (magnetisch), " +
+             "1 = linear, >1 = sanfter Auslauf")]
+    public float grappleAccelCurvePower = 0.5f;
     public float killRadius = 2f;
     public string grabbableTag = "Grabbable";
 
@@ -26,9 +38,15 @@ public class EnemyOperator : MonoBehaviour
     public LayerMask grabbableLayerMask = ~0; // Alle Layer standardmäßig
 
     [Header("Highlight Settings")]
-    public Color highlightColor = Color.yellow;
-    public float highlightIntensity = 1.5f;
-    public bool useEmission = true;
+    [Tooltip("Maximale Highlight-Staerke (0-1), die an _HighlightStrength im Shader gesendet wird")]
+    [Range(0f, 1f)]
+    public float highlightStrength = 1f;
+    [Tooltip("Pulsieren des Highlights, damit der Spieler deutlich sieht: hier kann interagiert werden")]
+    public bool pulseHighlight = true;
+    public float pulseSpeed = 4f;
+    [Tooltip("Untere Grenze des Pulsierens (relativ zu highlightStrength)")]
+    [Range(0f, 1f)]
+    public float pulseMin = 0.4f;
 
     [Header("Dynamic Collider Settings")]
     public float minColliderRadius = 0.5f;
@@ -45,6 +63,11 @@ public class EnemyOperator : MonoBehaviour
     public float safetyMargin = 0.2f; // Extra Abstand für Safety
 
     [Header("Hit Tracer (Impact Point)")]
+    [Tooltip("Radius der tatsächlichen Mesh-Oberfläche für den Hit-Tracer. " +
+             "WICHTIG: komplett unabhängig vom SphereCollider (der ist nur die " +
+             "distanzbasierte Grab-Trigger-Range und kann viel größer/kleiner sein " +
+             "als das echte Mesh). Bei gleich großen Gegnern reicht ein globaler Wert.")]
+    public float killSurfaceRadius = 0.6f;
     [Tooltip("Zusätzlicher Puffer vor der echten Mesh-Oberfläche, an dem der Enemy zerstört wird")]
     public float impactSurfaceBuffer = 0.4f;
     [Tooltip("Fallback-Distanz, falls kein Renderer/Bounds gefunden werden kann")]
@@ -63,6 +86,10 @@ public class EnemyOperator : MonoBehaviour
     private CharacterController characterController;
     private bool isGrappling = false;
 
+    // Optionaler Linseneffekt-Director (Neon-White Game Feel). Wird in Start()
+    // per GetComponent geholt; null-safe, das Grapple-System funktioniert auch ohne.
+    private GrappleLensDirector lensDirector;
+
     // Letzte tatsächliche Flugrichtung während des Grapples (wird in jedem
     // UpdateGrapple()-Tick aktualisiert) - EndGrapple(true) nutzt das, um dem
     // Spieler beim Loslassen seinen Schwung in genau dieser Richtung mitzugeben,
@@ -72,6 +99,12 @@ public class EnemyOperator : MonoBehaviour
     private Vector3 lastGrappleDirection = Vector3.zero;
     private Vector3 grappleTarget;
     private GameObject targetEnemy;
+    private Transform targetHitVolumeTransform; // Child-Collider-Transform, liefert die echte Hit-Position
+    private float grappleElapsedTime = 0f;
+    // Start-Flugstrecke (Reststrecke beim ersten UpdateGrapple-Tick, Hit-Tracer-
+    // basiert: distance - impactDistance). Referenz fuer den streckenbasierten
+    // Linseneffekt-Fortschritt (1 - rest/start) statt der zeitbasierten Rampe.
+    private float grappleStartRemainingDistance = -1f;
 
     private bool isInSlowMotion = false;
     private float slowMotionTimer = 0f;
@@ -80,8 +113,8 @@ public class EnemyOperator : MonoBehaviour
 
     private GameObject currentHighlightedObject = null;
     private Renderer highlightedRenderer = null;
-    private Material[] originalMaterials = null;
-    private Material[] highlightMaterials = null;
+    private MaterialPropertyBlock highlightPropBlock;
+    private static readonly int HighlightStrengthID = Shader.PropertyToID("_HighlightStrength");
 
     // Dynamic Collider State - ÜBERARBEITET
     private Dictionary<GameObject, SphereCollider> enemyColliders = new Dictionary<GameObject, SphereCollider>();
@@ -93,6 +126,7 @@ public class EnemyOperator : MonoBehaviour
     {
         fpsController = GetComponent<SC_FPSController>();
         characterController = GetComponent<CharacterController>();
+        lensDirector = GetComponent<GrappleLensDirector>();
 
         if (fpsController == null)
         {
@@ -162,6 +196,7 @@ public class EnemyOperator : MonoBehaviour
         if (!isGrappling)
         {
             UpdateHighlight();
+            UpdateHighlightPulse();
         }
 
         // Grapple Input
@@ -195,7 +230,15 @@ public class EnemyOperator : MonoBehaviour
         {
             if (hit.collider.CompareTag(grabbableTag))
             {
-                StartGrapple(hit.collider.gameObject, hit.point);
+                // Der Tag sitzt jetzt auf dem unsichtbaren Child-HitVolume, NICHT
+                // mehr auf dem Enemy-Parent. enemyRoot zeigt zurueck auf das
+                // eigentliche Objekt mit Mesh/Renderer/Shader (fuer Highlight/Destroy).
+                EnemyHitVolume hitVolume = hit.collider.GetComponent<EnemyHitVolume>();
+                GameObject enemyRoot = hitVolume != null && hitVolume.enemyRoot != null
+                    ? hitVolume.enemyRoot
+                    : hit.collider.gameObject; // Fallback falls kein HitVolume vorhanden
+
+                StartGrapple(enemyRoot, hit.collider.transform, hit.point);
             }
             else
             {
@@ -216,10 +259,17 @@ public class EnemyOperator : MonoBehaviour
         {
             if (hit.collider.CompareTag(grabbableTag))
             {
-                if (currentHighlightedObject != hit.collider.gameObject)
+                // Highlight (Fresnel-Rim) laeuft weiterhin auf dem Parent-Renderer,
+                // auch wenn der Raycast jetzt das Child-HitVolume trifft.
+                EnemyHitVolume hitVolume = hit.collider.GetComponent<EnemyHitVolume>();
+                GameObject enemyRoot = hitVolume != null && hitVolume.enemyRoot != null
+                    ? hitVolume.enemyRoot
+                    : hit.collider.gameObject;
+
+                if (currentHighlightedObject != enemyRoot)
                 {
                     RemoveHighlight();
-                    ApplyHighlight(hit.collider.gameObject);
+                    ApplyHighlight(enemyRoot);
                 }
             }
             else
@@ -240,47 +290,48 @@ public class EnemyOperator : MonoBehaviour
 
         if (highlightedRenderer != null)
         {
-            originalMaterials = highlightedRenderer.materials;
-            highlightMaterials = new Material[originalMaterials.Length];
+            if (highlightPropBlock == null)
+                highlightPropBlock = new MaterialPropertyBlock();
 
-            for (int i = 0; i < originalMaterials.Length; i++)
-            {
-                highlightMaterials[i] = new Material(originalMaterials[i]);
-                highlightMaterials[i].color = highlightColor;
-
-                if (useEmission)
-                {
-                    highlightMaterials[i].EnableKeyword("_EMISSION");
-                    highlightMaterials[i].SetColor("_EmissionColor", highlightColor * highlightIntensity);
-                }
-            }
-
-            highlightedRenderer.materials = highlightMaterials;
+            highlightedRenderer.GetPropertyBlock(highlightPropBlock);
+            highlightPropBlock.SetFloat(HighlightStrengthID, highlightStrength);
+            highlightedRenderer.SetPropertyBlock(highlightPropBlock);
         }
+    }
+
+    // Pulsieren: laeuft jeden Frame, solange ein Objekt gehighlightet ist.
+    void UpdateHighlightPulse()
+    {
+        if (currentHighlightedObject == null || highlightedRenderer == null)
+            return;
+
+        if (!pulseHighlight)
+            return;
+
+        float t = (Mathf.Sin(Time.time * pulseSpeed) * 0.5f + 0.5f);
+        float strength = Mathf.Lerp(highlightStrength * pulseMin, highlightStrength, t);
+
+        highlightedRenderer.GetPropertyBlock(highlightPropBlock);
+        highlightPropBlock.SetFloat(HighlightStrengthID, strength);
+        highlightedRenderer.SetPropertyBlock(highlightPropBlock);
     }
 
     void RemoveHighlight()
     {
-        if (currentHighlightedObject != null && highlightedRenderer != null && originalMaterials != null)
+        if (currentHighlightedObject != null && highlightedRenderer != null)
         {
-            highlightedRenderer.materials = originalMaterials;
+            if (highlightPropBlock == null)
+                highlightPropBlock = new MaterialPropertyBlock();
 
-            if (highlightMaterials != null)
-            {
-                foreach (Material mat in highlightMaterials)
-                {
-                    if (mat != null)
-                    {
-                        Destroy(mat);
-                    }
-                }
-            }
+            // Nur die Highlight-Staerke auf 0 -> Rim verschwindet, restliche
+            // (ggf. von anderen Skripten gesetzte) Properties bleiben erhalten.
+            highlightedRenderer.GetPropertyBlock(highlightPropBlock);
+            highlightPropBlock.SetFloat(HighlightStrengthID, 0f);
+            highlightedRenderer.SetPropertyBlock(highlightPropBlock);
         }
 
         currentHighlightedObject = null;
         highlightedRenderer = null;
-        originalMaterials = null;
-        highlightMaterials = null;
     }
 
     void RegisterAllGrabbableObjects()
@@ -386,14 +437,21 @@ public class EnemyOperator : MonoBehaviour
         }
     }
 
-    void StartGrapple(GameObject enemy, Vector3 hitPoint)
+    void StartGrapple(GameObject enemy, Transform hitVolumeTransform, Vector3 hitPoint)
     {
         RemoveHighlight();
 
+        grappleElapsedTime = 0f;
+        grappleStartRemainingDistance = -1f; // wird im ersten UpdateGrapple-Tick gesetzt
+        targetHitVolumeTransform = hitVolumeTransform;
+
         // NEUE: Collider komplett deaktivieren während Grapple (verhindert ANY Collision)
-        if (enableDynamicColliders && enemyColliders.ContainsKey(enemy))
+        // Key ist jetzt das Child-HitVolume-GameObject (traegt den SphereCollider),
+        // NICHT mehr der Enemy-Parent.
+        GameObject hitVolumeGO = hitVolumeTransform != null ? hitVolumeTransform.gameObject : enemy;
+        if (enableDynamicColliders && enemyColliders.ContainsKey(hitVolumeGO))
         {
-            SphereCollider sphereCol = enemyColliders[enemy];
+            SphereCollider sphereCol = enemyColliders[hitVolumeGO];
             if (sphereCol != null)
             {
                 // Option 1: Radius auf 0 setzen
@@ -407,8 +465,9 @@ public class EnemyOperator : MonoBehaviour
         }
 
         isGrappling = true;
+        if (lensDirector != null) lensDirector.OnGrappleStart();
         targetEnemy = enemy;
-        grappleTarget = enemy.transform.position;
+        grappleTarget = hitVolumeTransform != null ? hitVolumeTransform.position : enemy.transform.position;
 
         if (fpsController != null)
         {
@@ -431,7 +490,12 @@ public class EnemyOperator : MonoBehaviour
             return;
         }
 
-        grappleTarget = targetEnemy.transform.position;
+        // Position des Child-HitVolumes nutzen (das ist die tatsaechliche
+        // Kill-Geometrie), NICHT mehr targetEnemy.transform.position direkt -
+        // Parent koennte z.B. einen abweichenden Pivot haben.
+        Transform hitTransform = targetHitVolumeTransform != null ? targetHitVolumeTransform : targetEnemy.transform;
+
+        grappleTarget = hitTransform.position;
         Vector3 toTarget = grappleTarget - transform.position;
         float distance = toTarget.magnitude;
         Vector3 direction = distance > 0.0001f ? toTarget / distance : Vector3.zero;
@@ -445,18 +509,49 @@ public class EnemyOperator : MonoBehaviour
             lastGrappleDirection = direction;
         }
 
-        // Hit Tracer: nutzt EXAKT dieselbe Position + Richtung wie die Bewegung.
-        // Vorher: Ray ging Richtung bounds.center, distance/direction aber Richtung
-        // transform.position (Pivot) -> zwei verschiedene Punkte, dadurch inkonsistent
-        // (Instant-Kill bei großem Buffer, "Kriechen" + Clipping bei kleinem Buffer).
-        float impactDistance = CalculateImpactDistance(targetEnemy, transform.position, direction, distance);
+        // Hit Tracer: Radius kommt jetzt direkt vom Child-SphereCollider (echte
+        // Hit-Geometrie, vom Tess-Shader/Vertex-Displacement komplett entkoppelt -
+        // der Collider sitzt auf einem eigenen, unsichtbaren Child-Objekt).
+        float impactDistance = CalculateImpactDistance(hitTransform.gameObject, transform.position, direction, distance);
 
         if (characterController != null)
         {
-            float step = grappleSpeed * Time.deltaTime;
+            // Magnet-Anziehung: Ease-In statt konstanter grappleSpeed. Start
+            // bei grappleStartSpeedFactor (z.B. 25%), rampt binnen grappleAccelTime
+            // Sekunden auf volle grappleSpeed hoch. grappleAccelCurvePower < 1
+            // sorgt fuer einen spuerbaren "Schub" Richtung Ende der Rampe statt
+            // gleichmaessigem Anstieg -> fuehlt sich an wie ein zuschnappender Magnet.
+            grappleElapsedTime += Time.unscaledDeltaTime;
+            float accelT = grappleAccelTime > 0.0001f
+                ? Mathf.Clamp01(grappleElapsedTime / grappleAccelTime)
+                : 1f;
+            float curvedT = Mathf.Pow(accelT, Mathf.Max(0.01f, grappleAccelCurvePower));
+            float speedFactor = Mathf.Lerp(grappleStartSpeedFactor, 1f, curvedT);
+            float currentGrappleSpeed = grappleSpeed * speedFactor;
+
+            // unscaledDeltaTime: der Grapple soll IMMER gleich knackig sein,
+            // auch wenn gerade noch eine Slow-Motion aus einem vorherigen Kill
+            // laeuft (timeScale < 1). Mit Time.deltaTime wuerde der Flug sonst
+            // entsprechend der Slow-Motion verlangsamt -> "zaehes" Grabbing.
+            float step = currentGrappleSpeed * Time.unscaledDeltaTime;
 
             // Wie weit dürfen wir uns noch nähern, bevor wir die Mesh-Oberfläche erreichen?
             float maxAllowedStep = Mathf.Max(0f, distance - impactDistance);
+
+            // Streckenbasierter Linseneffekt-Fortschritt (Hit-Tracer-basiert):
+            // beim ersten Tick die noch zu fliegende Reststrecke als Referenz
+            // einfrieren, danach progress = 1 - (rest / start). Dadurch laeuft
+            // die Beat-Kurve ueber die ECHTE Flugdauer ab und passt sich der
+            // Distanz an - egal ob der Gegner nah oder weit weg ist.
+            if (grappleStartRemainingDistance < 0f)
+            {
+                grappleStartRemainingDistance = Mathf.Max(0.0001f, maxAllowedStep);
+            }
+            if (lensDirector != null)
+            {
+                float flightProgress = 1f - Mathf.Clamp01(maxAllowedStep / grappleStartRemainingDistance);
+                lensDirector.OnGrappleProgress(flightProgress);
+            }
 
             // Bewegung clampen -> Spieler bleibt immer vor der echten Mesh-Oberfläche
             float clampedStep = Mathf.Min(step, maxAllowedStep);
@@ -469,42 +564,96 @@ public class EnemyOperator : MonoBehaviour
 
         if (distance <= impactDistance)
         {
+            // Zielposition VOR dem Destroy cachen: targetEnemy/targetHitVolumeTransform
+            // werden in DestroyEnemyWithSlowMotion() bzw. danach ungueltig, der Spieler
+            // soll aber trotzdem exakt an dieser Stelle ankommen (gewuenschte Bewegungs-
+            // mechanik: Position des Enemies einnehmen, nicht kurz davor stehen bleiben).
+            Vector3 finalSnapPosition = grappleTarget;
             DestroyEnemyWithSlowMotion();
+            SnapToFinalGrapplePosition(finalSnapPosition);
         }
     }
 
-    // NEUE: Hit Tracer - berechnet den Abstand zur tatsächlichen Mesh-Oberfläche
-    // entlang DERSELBEN Linie, auf der sich der Spieler bewegt (fromPosition -> direction).
-    // So sind Distance-Check und Bewegungs-Clamp immer konsistent zueinander.
-    float CalculateImpactDistance(GameObject enemy, Vector3 fromPosition, Vector3 direction, float distanceToTarget)
+    // Bewegt den Spieler im selben Frame des Kills zur tatsaechlichen Enemy-
+    // Position, statt nur kurz vor der Aufprall-Distanz stehen zu bleiben.
+    // Nutzt characterController.Move() mit dem Differenzvektor -> respektiert
+    // weiterhin Unity-Kollisionsregeln (kein Teleport durch Waende).
+    void SnapToFinalGrapplePosition(Vector3 finalPosition)
     {
+        if (characterController == null) return;
+
+        Vector3 delta = finalPosition - transform.position;
+        if (delta.sqrMagnitude > 0.0001f)
+        {
+            characterController.Move(delta);
+        }
+    }
+
+    // Hit Tracer - berechnet den Abstand zur Kill-Oberflaeche anhand von
+    // killSurfaceRadius (fester, globaler Wert fuer die echte Mesh-Groesse).
+    // BEWUSST NICHT der SphereCollider aus enemyColliders: jener Collider ist
+    // die distanzbasierte Grab-TRIGGER-Range (skaliert 0.5-2.5 je nach Kamera-
+    // Abstand) und hat keinen Bezug zur tatsaechlichen visuellen Mesh-Groesse -
+    // genau das fuehrte zum "Instant-Kill beim Anklicken"-Bug. Ebenfalls NICHT
+    // Renderer.bounds: der TraumweltDeformTess-Shader verschiebt Vertices per
+    // Tessellation (_NoiseAmp), wodurch Bounds verzerrt/aufgeblaeht sein koennen.
+    // Hit Tracer - berechnet den Abstand zur Kill-Oberflaeche anhand des
+    // ECHTEN SphereColliders auf dem Child-HitVolume ("enemy"-Parameter ist hier
+    // das Child-GameObject, siehe Aufruf in UpdateGrapple). Dadurch ist die
+    // Geometrie 1:1 das, was man im Scene-View sieht und direkt einstellen kann -
+    // kein geschaetzter globaler Wert, kein vom Tess-Shader verzerrtes Renderer.bounds.
+    float CalculateImpactDistance(GameObject hitVolumeGO, Vector3 fromPosition, Vector3 direction, float distanceToTarget)
+    {
+        SphereCollider sphereCol = hitVolumeGO.GetComponent<SphereCollider>();
+        // Waehrend des Grapples wird sphereCol.radius bewusst auf 0.1f gesetzt
+        // (StartGrapple, verhindert Physik-Kollision) - DANN den ORIGINAL-Radius
+        // aus originalColliderRadii nehmen, sonst friert der Tracer auf 0.1 ein.
+        // Sonst (kein aktiver Grapple-Collider-Override) IMMER den LIVE-Wert von
+        // sphereCol.radius lesen, damit Inspector-Aenderungen sofort wirken -
+        // der originalColliderRadii-Cache wird nur EINMAL bei der Registrierung
+        // befuellt und wuerde Live-Edits sonst ignorieren.
+        float sphereRadius;
+        if (sphereCol != null)
+        {
+            bool isCollapsedForGrapple = isGrappling && Mathf.Approximately(sphereCol.radius, 0.1f);
+            if (isCollapsedForGrapple && originalColliderRadii.TryGetValue(hitVolumeGO, out float origRadius))
+            {
+                sphereRadius = origRadius;
+            }
+            else
+            {
+                sphereRadius = sphereCol.radius;
+            }
+        }
+        else
+        {
+            sphereRadius = Mathf.Max(killSurfaceRadius, fallbackImpactDistance);
+        }
+
         if (direction == Vector3.zero)
         {
-            return Mathf.Max(killRadius, fallbackImpactDistance);
+            return Mathf.Max(sphereRadius, fallbackImpactDistance);
         }
 
-        Renderer rend = enemy.GetComponent<Renderer>();
-        if (rend == null)
-        {
-            rend = enemy.GetComponentInChildren<Renderer>();
-        }
+        Vector3 toCenter = hitVolumeGO.transform.position - fromPosition;
+        float tCenter = Vector3.Dot(toCenter, direction);
+        float distSqToAxis = toCenter.sqrMagnitude - tCenter * tCenter;
+        float radiusSq = sphereRadius * sphereRadius;
 
-        if (rend != null)
+        if (distSqToAxis <= radiusSq)
         {
-            Bounds bounds = rend.bounds;
-            Ray tracerRay = new Ray(fromPosition, direction);
+            float offset = Mathf.Sqrt(radiusSq - distSqToAxis);
+            float hitDistance = tCenter - offset;
 
-            if (bounds.IntersectRay(tracerRay, out float hitDistance))
+            if (hitDistance >= 0f)
             {
-                // Clamp: impactDistance darf NIE größer sein als die tatsächlich
-                // verbleibende Distanz zum Pivot. Ein riesiger Buffer führt dadurch
-                // kontrolliert zu "sofort zerstören", statt zu inkonsistentem Verhalten.
                 return Mathf.Clamp(hitDistance + impactSurfaceBuffer, 0f, distanceToTarget);
             }
         }
 
-        // Fallback, falls kein Renderer gefunden wurde oder der Ray die Bounds verfehlt
-        return Mathf.Min(Mathf.Max(killRadius, fallbackImpactDistance), distanceToTarget);
+        // Strahl verfehlt die Sphere (z.B. Pivot stark versetzt) -> Fallback
+        // auf direkten Abstand zur Sphere-Oberfläche entlang der Distanz.
+        return Mathf.Clamp(distanceToTarget - sphereRadius + impactSurfaceBuffer, 0f, distanceToTarget);
     }
 
     void OnControllerColliderHit(ControllerColliderHit hit)
@@ -547,6 +696,7 @@ public class EnemyOperator : MonoBehaviour
 
             Destroy(targetEnemy);
             targetEnemy = null;
+            targetHitVolumeTransform = null; // Destroy() zerstört auch das Child mit
         }
 
         // NEUE: Weiß-Flash + FOV-Bounce im exakten Kill-Moment - kaschiert verbleibendes
@@ -555,6 +705,7 @@ public class EnemyOperator : MonoBehaviour
         {
             fpsController.TriggerImpactFeedback();
         }
+        if (lensDirector != null) lensDirector.OnGrappleImpact();
 
         isGrappling = false;
         StartSlowMotion();
@@ -633,6 +784,7 @@ public class EnemyOperator : MonoBehaviour
     {
         isGrappling = false;
         targetEnemy = null;
+        targetHitVolumeTransform = null;
 
         if (fpsController != null)
         {
@@ -650,6 +802,8 @@ public class EnemyOperator : MonoBehaviour
                 fpsController.ModifyMoveDirection(momentumVelocity);
             }
         }
+
+        if (lensDirector != null && !successful) lensDirector.OnGrappleAbort();
 
         Debug.Log(successful ? "Grapple erfolgreich!" : "Grapple abgebrochen");
     }
@@ -688,11 +842,17 @@ public class EnemyOperator : MonoBehaviour
     {
         if (isGrappling && targetEnemy != null)
         {
+            Transform hitT = targetHitVolumeTransform != null ? targetHitVolumeTransform : targetEnemy.transform;
+
             Gizmos.color = Color.red;
-            Gizmos.DrawLine(transform.position, targetEnemy.transform.position);
+            Gizmos.DrawLine(transform.position, hitT.position);
 
             Gizmos.color = Color.yellow;
-            Gizmos.DrawWireSphere(targetEnemy.transform.position, killRadius);
+            SphereCollider hitSphere = hitT.GetComponent<SphereCollider>();
+            float gizmoRadius = hitSphere != null
+                ? (originalColliderRadii.TryGetValue(hitT.gameObject, out float r) ? r : hitSphere.radius)
+                : killSurfaceRadius;
+            Gizmos.DrawWireSphere(hitT.position, gizmoRadius);
         }
 
         if (enableDynamicColliders && enemyColliders != null)
