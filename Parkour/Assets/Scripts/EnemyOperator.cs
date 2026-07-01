@@ -48,6 +48,15 @@ public class EnemyOperator : MonoBehaviour
     [Range(0f, 1f)]
     public float pulseMin = 0.4f;
 
+    [Header("Deform-Reaktion beim Anvisieren (TraumweltDeformTess)")]
+    [Tooltip("_NoiseAmp-Wert, der gesetzt wird, waehrend der Gegner DIREKT anvisiert wird (kleiner = ruhigere, glattere Oberflaeche). Originalwert wird automatisch vom Material gelesen.")]
+    public float aimedNoiseAmp = 0.04f;
+    [Tooltip("Geschwindigkeit des linearen Uebergangs (Phase pro Sekunde) zwischen normalem und anvisiertem Zustand - treibt Oberflaechen-Amplitude, Scale-Pulse UND FOV/Vignette in SC_FPSController gemeinsam")]
+    public float deformLerpSpeed = 5f;
+    [Tooltip("Staerke des Skalierungs-Pulsierens beim Anvisieren, relativ zur Originalgroesse (z.B. 0.08 = ±8%)")]
+    public float aimedScalePulseAmount = 0.08f;
+    public float aimedScalePulseSpeed = 6f;
+
     [Header("Dynamic Collider Settings")]
     public float minColliderRadius = 0.5f;
     public float maxColliderRadius = 2.5f;
@@ -115,6 +124,15 @@ public class EnemyOperator : MonoBehaviour
     private Renderer highlightedRenderer = null;
     private MaterialPropertyBlock highlightPropBlock;
     private static readonly int HighlightStrengthID = Shader.PropertyToID("_HighlightStrength");
+
+    // Deform-on-Aim (_NoiseAmp + Scale-Pulse) - nutzt dieselbe MPB-Logik wie Highlight
+    private static readonly int NoiseAmpID = Shader.PropertyToID("_NoiseAmp");
+    private GameObject deformTarget = null;
+    private Renderer deformRenderer = null;
+    private MaterialPropertyBlock deformPropBlock;
+    private float deformOriginalNoiseAmp = 0f;
+    private Vector3 deformOriginalScale = Vector3.one;
+    private float deformPhase = 0f; // 0 = Originalzustand, 1 = voll anvisiert
 
     // Dynamic Collider State - ÜBERARBEITET
     private Dictionary<GameObject, SphereCollider> enemyColliders = new Dictionary<GameObject, SphereCollider>();
@@ -197,6 +215,7 @@ public class EnemyOperator : MonoBehaviour
         {
             UpdateHighlight();
             UpdateHighlightPulse();
+            UpdateDeformOnTarget();
         }
 
         // Grapple Input
@@ -332,6 +351,89 @@ public class EnemyOperator : MonoBehaviour
 
         currentHighlightedObject = null;
         highlightedRenderer = null;
+    }
+
+    // Wechselt das Deform-Ziel: setzt das vorherige sofort zurueck und cached die
+    // Originalwerte (NoiseAmp vom sharedMaterial, Scale vom Transform) des neuen Ziels.
+    void StartDeformTarget(GameObject target)
+    {
+        ResetDeformImmediate();
+
+        deformTarget = target;
+        deformRenderer = target.GetComponent<Renderer>();
+        deformOriginalScale = target.transform.localScale;
+
+        if (deformRenderer != null && deformRenderer.sharedMaterial != null)
+        {
+            deformOriginalNoiseAmp = deformRenderer.sharedMaterial.GetFloat(NoiseAmpID);
+        }
+
+        if (deformPropBlock == null)
+            deformPropBlock = new MaterialPropertyBlock();
+    }
+
+    // Setzt das aktuelle Deform-Ziel sofort auf seine Originalwerte zurueck
+    // (NoiseAmp + Scale) und gibt die Referenzen frei.
+    void ResetDeformImmediate()
+    {
+        if (deformTarget != null)
+        {
+            if (deformRenderer != null)
+            {
+                deformRenderer.GetPropertyBlock(deformPropBlock);
+                deformPropBlock.SetFloat(NoiseAmpID, deformOriginalNoiseAmp);
+                deformRenderer.SetPropertyBlock(deformPropBlock);
+            }
+            deformTarget.transform.localScale = deformOriginalScale;
+        }
+
+        deformTarget = null;
+        deformRenderer = null;
+        deformPhase = 0f;
+    }
+
+    // Laeuft jeden Frame (ausser beim Grappling): lerpt _NoiseAmp + Scale-Pulsieren
+    // Richtung "anvisiert", solange currentHighlightedObject gesetzt ist (= direkter
+    // Blick, kommt 1:1 aus UpdateHighlight()'s Raycast) - und wieder zurueck Richtung
+    // Original, sobald der Spieler nicht mehr direkt hinschaut.
+    void UpdateDeformOnTarget()
+    {
+        bool isAiming = currentHighlightedObject != null;
+
+        if (isAiming && deformTarget != currentHighlightedObject)
+        {
+            StartDeformTarget(currentHighlightedObject);
+        }
+
+        if (deformTarget == null)
+        {
+            if (fpsController != null) fpsController.SetAimEmphasis(0f);
+            return;
+        }
+
+        float targetPhase = isAiming ? 1f : 0f;
+        deformPhase = Mathf.MoveTowards(deformPhase, targetPhase, Time.deltaTime * deformLerpSpeed);
+
+        // Treibt zusaetzlich FOV-Zoom + Vignette in SC_FPSController - dieselbe Phase
+        // wie Deform/Scale-Pulse, fuer ein kohaerentes "Anvisier"-Gefuehl aus einer Hand.
+        if (fpsController != null) fpsController.SetAimEmphasis(deformPhase);
+
+        if (deformRenderer != null)
+        {
+            float amp = Mathf.Lerp(deformOriginalNoiseAmp, aimedNoiseAmp, deformPhase);
+            deformRenderer.GetPropertyBlock(deformPropBlock);
+            deformPropBlock.SetFloat(NoiseAmpID, amp);
+            deformRenderer.SetPropertyBlock(deformPropBlock);
+        }
+
+        float pulse = Mathf.Sin(Time.time * aimedScalePulseSpeed) * aimedScalePulseAmount * deformPhase;
+        deformTarget.transform.localScale = deformOriginalScale * (1f + pulse);
+
+        // Nicht mehr anvisiert und Originalzustand erreicht -> Referenzen freigeben
+        if (!isAiming && deformPhase <= 0.001f)
+        {
+            ResetDeformImmediate();
+        }
     }
 
     void RegisterAllGrabbableObjects()
@@ -811,6 +913,7 @@ public class EnemyOperator : MonoBehaviour
     void OnDestroy()
     {
         RemoveHighlight();
+        ResetDeformImmediate();
 
         // NEUE: Originale States wiederherstellen
         foreach (var kvp in enemyColliders)

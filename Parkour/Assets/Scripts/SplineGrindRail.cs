@@ -141,16 +141,18 @@ public class SplineGrindRail : MonoBehaviour
         // (größeren) magnetRadius, aber nicht exakt auf der Linie war.
         Vector3 snapTargetPosition = (Vector3)splineContainer.EvaluatePosition(splineIndex, nearestT);
 
-        // Bewegungsrichtung des Spielers ermitteln
-        CharacterController cc = player.GetComponentInParent<CharacterController>();
-        Vector3 playerVelocity = cc != null ? cc.velocity : Vector3.zero;
-
-        bool movingForward = DetermineDirectionFromVelocity(playerVelocity, nearestT);
+        // Einstiegsrichtung NICHT mehr aus der CharacterController-Velocity
+        // bestimmen, sondern aus der Kamera-Blickrichtung. Velocity konnte z.B.
+        // am Sprung-Scheitelpunkt (fast keine horizontale Bewegung) oder durch
+        // Air-Strafing kurzzeitig von der tatsächlichen Absicht des Spielers
+        // abweichen, was zu einer ungewollten 180°-Drehung beim Einstieg führte.
+        // Die Blickrichtung ist eindeutig und unterbricht den Bewegungsfluss nicht.
+        bool movingForward = DetermineDirectionFromLookDirection(handler, nearestT);
 
         handler.StartGrind(splineContainer, splineIndex, movingForward, nearestT, snapTargetPosition);
 
         if (showDebugInfo)
-            Debug.Log($"🛤️ SplineGrindRail: Einstieg bei t={nearestT:F2} ({(movingForward ? "vorwärts" : "rückwärts")}), Spieler-Speed: {playerVelocity.magnitude:F1} m/s | Magnet-Distanz: {Vector3.Distance(player.transform.position, snapTargetPosition):F2}m");
+            Debug.Log($"🛤️ SplineGrindRail: Einstieg bei t={nearestT:F2} ({(movingForward ? "vorwärts" : "rückwärts")}), Magnet-Distanz: {Vector3.Distance(player.transform.position, snapTargetPosition):F2}m");
     }
 
     /// <summary>
@@ -179,18 +181,31 @@ public class SplineGrindRail : MonoBehaviour
     }
 
     /// <summary>
-    /// Vergleicht die Spieler-Bewegungsrichtung mit der Spline-Tangente an der
-    /// Eintrittsstelle per Skalarprodukt. Positiv -> Spieler bewegt sich in
+    /// Vergleicht die Kamera-BLICKRICHTUNG des Spielers mit der Spline-Tangente
+    /// an der Eintrittsstelle per Skalarprodukt. Positiv -> Blick zeigt in
     /// Tangentenrichtung (Richtung t=1, "vorwärts"). Negativ -> Gegenrichtung.
+    /// Nur die horizontale (XZ-)Komponente der Blickrichtung zählt, damit reines
+    /// Hoch-/Runterschauen die erkannte Richtung nicht verfälscht.
     /// </summary>
-    bool DetermineDirectionFromVelocity(Vector3 playerVelocity, float t)
+    bool DetermineDirectionFromLookDirection(SplineGrindHandler handler, float t)
     {
-        if (playerVelocity.sqrMagnitude < 0.01f)
-            return true; // Spieler steht praktisch still - Default: vorwärts
+        Camera cam = handler.playerCamera;
+        if (cam == null)
+            return true; // Keine Kamera-Referenz vorhanden - Default: vorwärts
+
+        Vector3 lookDir = cam.transform.forward;
+        lookDir.y = 0f;
+
+        if (lookDir.sqrMagnitude < 0.0001f)
+            return true; // Blick exakt senkrecht - Default: vorwärts
 
         Vector3 tangent = (Vector3)splineContainer.EvaluateTangent(splineIndex, t);
-        float dot = Vector3.Dot(playerVelocity.normalized, tangent.normalized);
+        tangent.y = 0f;
 
+        if (tangent.sqrMagnitude < 0.0001f)
+            return true; // Tangente an dieser Stelle ohne horizontale Komponente - Default: vorwärts
+
+        float dot = Vector3.Dot(lookDir.normalized, tangent.normalized);
         return dot >= 0f;
     }
 

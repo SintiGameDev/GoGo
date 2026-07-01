@@ -25,7 +25,7 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _PERSPECTIVE
+  - _REFLECTIONS
   - _WORLD_SPACE_UV
   m_InvalidKeywords: []
   m_LightmapFlags: 4
@@ -35,7 +35,7 @@ Material:
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
-  m_LockedProperties: _NormalTexture
+  m_LockedProperties: _NormalTexture _WaveSteepness
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -99,46 +99,46 @@ Material:
     - _BoilingStrength: 1
     - _BoilingTiling: 0
     - _CaveBlend: 0
-    - _CaveDistortion: 0
+    - _CaveDistortion: 2
     - _DepthCompareDistance: 0.1
-    - _DepthFadeDistance: 10
+    - _DepthFadeDistance: 41
     - _FoamBlend: 0.09
     - _FresnelPower: 1
-    - _GradientRefractionScale: 1
-    - _HorizonDistance: 78
+    - _GradientRefractionScale: 10
+    - _HorizonDistance: 41.9
     - _Hue: 1
     - _IntersectionFoamBlend: 1.09
-    - _IntersectionFoamCutoff: 3.57
-    - _IntersectionFoamDepth: 2
+    - _IntersectionFoamCutoff: 3
+    - _IntersectionFoamDepth: 4
     - _IntersectionFoamDirection: 0.65
-    - _IntersectionFoamFade: 1.48
-    - _IntersectionFoamSpeed: 50
-    - _IntersectionFoamTiling: 0.02
+    - _IntersectionFoamFade: 3
+    - _IntersectionFoamSpeed: 0.05
+    - _IntersectionFoamTiling: 0.05
     - _LightingHardness: 0.39
     - _LightingSmoothness: 12.34
-    - _NormalScale: 0.02
-    - _NormalSpeed: 5
-    - _NormalStrength: 0
+    - _NormalScale: 30
+    - _NormalSpeed: 0.2
+    - _NormalStrength: 1
     - _OrthographicCamSize: 0
-    - _PERSPECTIVE: 1
+    - _PERSPECTIVE: 0
     - _PosterizeSteps: 0
     - _QueueControl: 1
     - _QueueOffset: -49
-    - _REFLECTIONS: 0
-    - _ReflectionBlend: 0
+    - _REFLECTIONS: 1
+    - _ReflectionBlend: 0.476
     - _ReflectionDistortion: 0.38
-    - _RefractionScale: 1
-    - _RefractionSpeed: 0.01
-    - _RefractionStrength: 0
+    - _RefractionScale: 0
+    - _RefractionSpeed: 0.2
+    - _RefractionStrength: 3
     - _RippleStrength: 83.62
     - _Saturation: 1
     - _SecondaryFoamBlend: 0.06
     - _Show: 0
     - _SkyboxForce: 2.5
     - _Steps: 8
-    - _SurfaceFoamDirection: 0
+    - _SurfaceFoamDirection: 1
     - _SurfaceFoamDistorsion: 0.45
-    - _SurfaceFoamSpeed: 0.2
+    - _SurfaceFoamSpeed: 0.1
     - _SurfaceFoamTiling: 0.06
     - _TileSize: 200
     - _Value: 1
@@ -155,15 +155,15 @@ Material:
     - _WaveTileSize: 0
     m_Colors:
     - _BaseColor: {r: 0, g: 0.1989687, b: 1.110646, a: 1}
-    - _CaveColor: {r: 0, g: 0.37303403, b: 0.7830189, a: 0.54509807}
+    - _CaveColor: {r: 0, g: 0.22898397, b: 0.31132078, a: 0.54509807}
     - _CaveOffset: {r: -0.45, g: 0, b: 0, a: 0}
-    - _CaveScale: {r: 0.2, g: 0.2, b: 0, a: 0}
+    - _CaveScale: {r: 0.1, g: 0.1, b: 0, a: 0}
     - _CaveSecondaryColor: {r: 0, g: 0, b: 0, a: 0}
-    - _DeepColor: {r: 0, g: 0.0056006783, b: 0.13207549, a: 1}
+    - _DeepColor: {r: 0.22530259, g: 0.2356017, b: 0.5754717, a: 1}
     - _FoamUVsOffset: {r: 0, g: 0, b: 0, a: 0}
     - _FresnelColor: {r: 2.670157, g: 2.670157, b: 2.670157, a: 0}
-    - _HorizonColor: {r: 0.3260297, g: 0, b: 0.05320879, a: 1}
-    - _IntersectionFoamColor: {r: 0.012201336, g: 0.057918154, b: 0.08150743, a: 1}
+    - _HorizonColor: {r: 0.22696589, g: 0.23455065, b: 0.57758063, a: 0}
+    - _IntersectionFoamColor: {r: 0, g: 0.6603777, b: 0.990566, a: 1}
     - _PositionRipples: {r: 0, g: 0, b: 0, a: 0}
     - _SecondaryFoamColor: {r: 0, g: 0.20427155, b: 1, a: 0.40784314}
     - _ShallowColor: {r: 0, g: 0.12460327, b: 1, a: 1}

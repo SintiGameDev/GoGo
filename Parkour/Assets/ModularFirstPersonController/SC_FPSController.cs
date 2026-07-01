@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 [RequireComponent(typeof(CharacterController))]
 public class SC_FPSController : MonoBehaviour
@@ -88,6 +90,15 @@ public class SC_FPSController : MonoBehaviour
     [Tooltip("Wie schnell das FOV nach dem Bounce wieder zurueckfedert")]
     public float impactFovBounceOutDuration = 0.25f;
 
+    [Header("Aim Emphasis (Anvisieren von Gegnern)")]
+    [Tooltip("URP Volume mit aktiviertem Vignette-Override im Profile. Wird beim Anvisieren weich eingeblendet, sonst unangetastet.")]
+    public Volume aimEmphasisVolume;
+    [Tooltip("Subtiler Zoom beim vollen Anvisieren, in FOV-Grad (wird vom Speed-FOV abgezogen). Klein halten, z.B. 3-6.")]
+    public float aimFOVOffset = 4f;
+    [Tooltip("Ziel-Intensity der Vignette beim vollen Anvisieren (0 = aus). Lerpt zwischen 0 und diesem Wert mit der Anvisier-Phase.")]
+    [Range(0f, 1f)]
+    public float aimVignetteIntensity = 0.25f;
+
     [Header("Speed Settings")]
     public float speedTransitionRate = 10f;
     [Tooltip("Maximale Gesamtgeschwindigkeit (x/y/z kombiniert), auf die moveDirection vor jedem Move gecapt wird. " +
@@ -115,6 +126,11 @@ public class SC_FPSController : MonoBehaviour
 
     private LTDescr fovTween;
     private float lastTargetFOV = 0f;
+
+    // Aim Emphasis (von EnemyOperator getrieben, 0 = normal, 1 = voll anvisiert)
+    private float currentAimPhase = 0f;
+    private Vignette aimVignette;
+    private bool aimVignetteAvailable = false;
 
     private LTDescr impactFlashTween;
     private LTDescr impactFovTween;
@@ -157,6 +173,8 @@ public class SC_FPSController : MonoBehaviour
 
         wallGrabExitInputThreshold = Mathf.Clamp01(wallGrabExitInputThreshold);
         wallGrabReentryCooldown = Mathf.Max(0f, wallGrabReentryCooldown);
+
+        aimFOVOffset = Mathf.Max(0f, aimFOVOffset);
     }
 
     void Start()
@@ -191,6 +209,15 @@ public class SC_FPSController : MonoBehaviour
         {
             playerCamera.fieldOfView = baseFOV;
             lastTargetFOV = baseFOV;
+        }
+
+        if (aimEmphasisVolume != null && aimEmphasisVolume.profile != null)
+        {
+            aimVignetteAvailable = aimEmphasisVolume.profile.TryGet(out aimVignette);
+            if (!aimVignetteAvailable)
+            {
+                Debug.LogWarning("aimEmphasisVolume hat keinen Vignette-Override im Profile!");
+            }
         }
 
         if (impactFlashImage != null)
@@ -390,8 +417,10 @@ public class SC_FPSController : MonoBehaviour
 
         // Controller bewegen
         // Waehrend des Grapples bewegt EnemyOperator den Spieler ueber den Hit-Tracer.
+        // Waehrend canMove == false (z.B. SplineGrindHandler) ist der CharacterController
+        // selbst deaktiviert -> Move() wuerde "Move called on inactive controller" werfen.
         // Kein zusaetzlicher Move-Call hier, sonst tunnelt der Spieler trotz Tracer-Clamp ins Mesh.
-        if (!isGrappling)
+        if (!isGrappling && canMove && characterController.enabled)
         {
             characterController.Move(moveDirection * Time.deltaTime);
         }
@@ -426,7 +455,10 @@ public class SC_FPSController : MonoBehaviour
             float currentHorizontalSpeed = flatVelocity.magnitude;
 
             float speedRatio = Mathf.Clamp01(currentHorizontalSpeed / fovSpeedThreshold);
-            float targetFOV = Mathf.Lerp(baseFOV, maxFOV, speedRatio);
+            // Aim Emphasis: subtiler Zoom-In zieht sich additiv vom Speed-FOV ab, laeuft
+            // ueber denselben Tween-Mechanismus wie die Speed-FOV-Aenderung (kein zweiter,
+            // konkurrierender LeanTween auf playerCamera.gameObject).
+            float targetFOV = Mathf.Lerp(baseFOV, maxFOV, speedRatio) - aimFOVOffset * currentAimPhase;
 
             if (Mathf.Abs(lastTargetFOV - targetFOV) > 0.5f)
             {
@@ -654,6 +686,18 @@ public class SC_FPSController : MonoBehaviour
         if (speed > currentSmoothRunSpeed)
         {
             currentSmoothRunSpeed = speed;
+        }
+    }
+
+    // Von EnemyOperator jeden Frame aufgerufen, solange ein Gegner anvisiert wird/
+    // gerade aus dem Anvisieren zurueckkehrt. phase: 0 = normal, 1 = voll anvisiert.
+    public void SetAimEmphasis(float phase)
+    {
+        currentAimPhase = Mathf.Clamp01(phase);
+
+        if (aimVignetteAvailable)
+        {
+            aimVignette.intensity.Override(Mathf.Lerp(0f, aimVignetteIntensity, currentAimPhase));
         }
     }
 

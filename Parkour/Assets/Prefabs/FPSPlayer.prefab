@@ -193,9 +193,9 @@ MonoBehaviour:
   grappleAccelCurvePower: 0.5
   killRadius: 2
   grabbableTag: Grabbable
-  momentumRetentionMultiplier: 1.34
+  momentumRetentionMultiplier: 1.5
   slowMotionTimeScale: 0.2
-  slowMotionDuration: 0.02
+  slowMotionDuration: 0.05
   autoJumpForce: 40
   heightDeltaToEndSlowMo: 0.5
   maxGrappleDistance: 40
@@ -207,6 +207,10 @@ MonoBehaviour:
   pulseHighlight: 1
   pulseSpeed: 4
   pulseMin: 0.215
+  aimedNoiseAmp: 0
+  deformLerpSpeed: 200
+  aimedScalePulseAmount: 0.2
+  aimedScalePulseSpeed: 4
   minColliderRadius: 3
   maxColliderRadius: 15
   minScaleDistance: 2
@@ -217,7 +221,7 @@ MonoBehaviour:
   colliderUpdateSmoothness: 5
   safetyMargin: 0.2
   killSurfaceRadius: 2
-  impactSurfaceBuffer: 1
+  impactSurfaceBuffer: 2
   fallbackImpactDistance: 0.6
   destroyEffect: {fileID: 0}
   grappleSound: {fileID: 0}
@@ -245,11 +249,11 @@ MonoBehaviour:
   riseGravityMultiplier: 1.1
   fallGravityMultiplier: 2
   lowJumpGravityMultiplier: 3
-  coyoteTime: 0.12
+  coyoteTime: 0.13
   jumpBufferTime: 0.12
-  airControlFactor: 0.7
+  airControlFactor: 0.85
   airAcceleration: 400
-  wallJumpMomentumRetain: 0.95
+  wallJumpMomentumRetain: 1
   apexThreshold: 1.5
   apexGravityMultiplier: 0.5
   playerCamera: {fileID: 2304776757904105273}
@@ -265,7 +269,7 @@ MonoBehaviour:
   wallGrabExitInputThreshold: 0.3
   wallGrabReentryCooldown: 0.25
   baseFOV: 80
-  maxFOV: 90
+  maxFOV: 100
   fovChangeDuration: 0.2
   fovSpeedThreshold: 15
   impactFlashImage: {fileID: 0}
@@ -275,6 +279,9 @@ MonoBehaviour:
   impactFovBounceAmount: 12
   impactFovBounceInDuration: 0.05
   impactFovBounceOutDuration: 0.25
+  aimEmphasisVolume: {fileID: 0}
+  aimFOVOffset: 4
+  aimVignetteIntensity: 0.25
   speedTransitionRate: 50
   maxTotalVelocity: 85
   canMove: 1
@@ -314,15 +321,17 @@ MonoBehaviour:
   characterController: {fileID: 0}
   playerCamera: {fileID: 0}
   velocityMultiplier: {fileID: 0}
-  minGrindSpeed: 20
-  maxGrindSpeed: 45
-  entrySpeedMultiplier: 1.5
+  minGrindSpeed: 15
+  maxGrindSpeed: 50
+  entrySpeedMultiplier: 1.2
   verticalOffset: 0.5
   magnetSnapDuration: 0.12
-  yawAlignSpeed: 12
+  yawAlignSpeed: 6
+  cameraYawSmoothSpeed: 3
+  tangentSmoothSpeed: 40
   regrindCooldown: 0.3
-  earlyExitForwardBoost: 25
-  earlyExitUpwardBoost: 10
+  earlyExitForwardBoost: 35
+  earlyExitUpwardBoost: 50
   lookSpeed: 2
   lookXLimit: 45
   showDebugInfo: 1
@@ -891,7 +900,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4538536580974083876}
-  m_Mesh: {fileID: 0}
+  m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!23 &6061815406738536665
 MeshRenderer:
   m_ObjectHideFlags: 0

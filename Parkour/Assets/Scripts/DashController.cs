@@ -122,6 +122,14 @@ public class DashController : MonoBehaviour
         if (isDashing)
             return;
 
+        // Während der Controller von außen deaktiviert ist (z.B. während eines
+        // Spline-Grinds über SplineGrindHandler), soll erst gar kein neuer Dash
+        // starten - der Spieler hat in dem Zustand sowieso keine reguläre
+        // Bewegungskontrolle (vgl. SC_FPSController.canMove), ein im Hintergrund
+        // "unsichtbar" laufender und abklingender Dash wäre nur verwirrend.
+        if (!characterController.enabled)
+            return;
+
         if (Time.time - lastDashEndTime < dashCooldown)
         {
             if (showDebugInfo)
@@ -154,6 +162,22 @@ public class DashController : MonoBehaviour
     void ApplyDashMovement()
     {
         if (!isDashing)
+            return;
+
+        // Guard: characterController.enabled kann von außen deaktiviert sein (z.B.
+        // von SplineGrindHandler während eines Grinds, das den Controller EINMAL
+        // deaktiviert statt pro Frame zu togglen - siehe dort). Move() auf einem
+        // deaktivierten CharacterController wirft eine Warnung und hat keinen
+        // Effekt. Den laufenden Dash NICHT abbrechen (isDashing bleibt true,
+        // dashStartTime bleibt unverändert) - er pausiert einfach für die Dauer
+        // der Deaktivierung und macht beim nächsten aktiven Frame an der Stelle
+        // weiter, an der die verstrichene Zeit (elapsed) bereits steht. Das ist
+        // ein bewusster Kompromiss: ein Dash, der zufällig auf einen Grind-Einstieg
+        // trifft, klingt dadurch ggf. etwas schneller ab (da Time.time weiterläuft,
+        // auch wenn Move() nicht greift), ist aber immer noch korrekter als ein
+        // Move()-Aufruf auf inaktivem Controller oder ein hartes Abschneiden mitten
+        // im Dash.
+        if (!characterController.enabled)
             return;
 
         float elapsed = Time.time - dashStartTime;
